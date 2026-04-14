@@ -1,3 +1,5 @@
+import { Result } from "../lib/result";
+
 export type statusType = "published" | "draft" | "cancelled" | "past";
 
 export interface IEvent {
@@ -26,4 +28,7 @@ export interface IRSVP {
 
 
 export interface IEventRepository {
+  addEvent(event: IEvent): Promise<Result<IEvent, Error>>;
+  editEvent(eventId: string, event: IEvent): Promise<Result<IEvent, Error>>;
+  getEvent(eventId: string): Promise<Result<IEvent, Error>>;
 }

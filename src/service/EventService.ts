@@ -2,16 +2,7 @@
 
 import { Result, Ok, Err } from "../lib/result";
 import type { ILoggingService } from "./LoggingService";
-import type { statusType, IEvent, IRSVP } from "../repository/EntryRepository";
-/**
- * Repository interface the service depends on.
- * Implemented by InMemoryEventRepository.
- */
-export interface IEventRepository {
-  addEvent(event: IEvent): Promise<Result<IEvent, Error>>;
-  editEvent(eventId: string, event: IEvent): Promise<Result<IEvent, Error>>;
-  getEvent(eventId: string): Promise<Result<IEvent, Error>>;
-}
+import type { statusType, IEvent, IRSVP, IEventRepository } from "../repository/EntryRepository";
 
 /**
  * Service interface — imported by EventController.
