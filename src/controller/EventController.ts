@@ -72,16 +72,19 @@ class EventController implements IEventController {
     const endDateTimeRaw = typeof input.endDateTime === "string" ? input.endDateTime.trim() : "";
 
     if (!title) {
+      this.logger.warn("Create event failed: Title is required.");
       res.status(400);
       await this.showCreateEventForm(res, session, "Title is required.");
       return;
     }
     if (!startDateTimeRaw) {
+      this.logger.warn("Create event failed: Start date/time is required.");
       res.status(400);
       await this.showCreateEventForm(res, session, "Start date/time is required.");
       return;
     }
     if (!endDateTimeRaw) {
+      this.logger.warn("Create event failed: End date/time is required.");
       res.status(400);
       await this.showCreateEventForm(res, session, "End date/time is required.");
       return;
@@ -93,18 +96,21 @@ class EventController implements IEventController {
     const endDate = new Date(endDateTimeRaw);
 
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      this.logger.warn("Create event failed: Invalid date/time format.");
       res.status(400);
       await this.showCreateEventForm(res, session, "Invalid date/time format.");
       return;
     }
 
     if (startDate < createdAt) {
+      this.logger.warn("Create event failed: Event start cannot be before creation time.");
       res.status(400);
       await this.showCreateEventForm(res, session, "Event start cannot be before creation time.");
       return;
     }
 
     if (startDate >= endDate) {
+      this.logger.warn("Create event failed: Event start must be before end time.");
       res.status(400);
       await this.showCreateEventForm(res, session, "Event start must be before end time.");
       return;
@@ -115,6 +121,7 @@ class EventController implements IEventController {
     if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
       const parsed = typeof input.capacity === "number" ? input.capacity : parseInt(String(input.capacity), 10);
       if (!Number.isFinite(parsed) || parsed <= 0) {
+        this.logger.warn("Create event failed: Capacity must be a positive non-zero number.");
         res.status(400);
         await this.showCreateEventForm(res, session, "Capacity must be a positive non-zero number.");
         return;
