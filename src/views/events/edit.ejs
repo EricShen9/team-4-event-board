@@ -1,0 +1,254 @@
+<section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
+  <h1 class="text-3xl font-bold text-slate-900 mb-3">Edit Event</h1>
+  <p class="text-slate-500">
+    Modify the event details below. Fields left blank will keep their current values.
+    Required fields are marked with <span class="text-red-500">*</span>.
+  </p>
+  <% if (session.authenticatedUser) { %>
+    <p class="text-slate-500 mt-2 mb-0">
+      Editing as
+      <strong class="text-slate-700"><%= session.authenticatedUser.displayName %></strong>
+      (<%= session.authenticatedUser.role %>).
+    </p>
+  <% } %>
+  <% if (event) { %>
+    <div class="mt-3 flex flex-wrap gap-2">
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium
+        <% if (event.status === 'published') { %>bg-green-100 text-green-800
+        <% } else if (event.status === 'draft') { %>bg-yellow-100 text-yellow-800
+        <% } else if (event.status === 'cancelled') { %>bg-red-100 text-red-800
+        <% } else if (event.status === 'past') { %>bg-slate-100 text-slate-800
+        <% } else { %>bg-slate-100 text-slate-800<% } %>">
+        Status: <%= event.status %>
+      </span>
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+        ID: <%= event.id %>
+      </span>
+    </div>
+  <% } %>
+</section>
+
+<% if (!event) { %>
+  <section class="max-w-3xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
+    <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 font-medium">
+      <span class="mr-1">✗</span> Event not found or unable to load.
+    </div>
+    <div class="mt-4">
+      <a href="/home" class="text-blue-600 hover:underline">← Return to home</a>
+    </div>
+  </section>
+<% } else { %>
+  <section class="max-w-3xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">Event Details</h2>
+      <p class="text-slate-500">
+        <% if (event.status === 'cancelled') { %>
+          <span class="text-red-600 font-medium">⚠️ This event is cancelled and cannot be modified.</span>
+        <% } else if (event.status === 'past' || new Date(event.startDateTime) < new Date()) { %>
+          <span class="text-amber-600 font-medium">⚠️ This event has passed and cannot be modified.</span>
+        <% } else { %>
+          Update the fields you wish to change. Leave fields blank to keep current values.
+        <% } %>
+      </p>
+    </div>
+
+    <% const isEditable = event.status !== 'cancelled' && event.status !== 'past' && new Date(event.startDateTime) >= new Date(); %>
+
+    <form
+      class="grid gap-4"
+      method="post"
+      action="/events/<%= event.id %>"
+      hx-post="/events/<%= event.id %>"
+      hx-target="#form-status"
+      hx-select="#form-status"
+      hx-swap="outerHTML"
+    >
+      <div>
+        <label for="title" class="block text-sm font-medium mb-1">
+          Title <span class="text-red-500">*</span>
+        </label>
+        <input
+          id="title"
+          name="title"
+          type="text"
+          value="<%= event.title %>"
+          placeholder="e.g. Annual Company Picnic"
+          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          <% if (!isEditable) { %>disabled<% } %>
+        />
+      </div>
+
+      <div>
+        <label for="description" class="block text-sm font-medium mb-1">Description</label>
+        <textarea
+          id="description"
+          name="description"
+          rows="3"
+          placeholder="Describe what the event is about…"
+          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500 resize-y"
+          <% if (!isEditable) { %>disabled<% } %>
+        ><%= event.description || '' %></textarea>
+      </div>
+
+      <div>
+        <label for="location" class="block text-sm font-medium mb-1">Location</label>
+        <input
+          id="location"
+          name="location"
+          type="text"
+          value="<%= event.location || '' %>"
+          placeholder="e.g. Main Hall, Room 204, Online"
+          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          <% if (!isEditable) { %>disabled<% } %>
+        />
+      </div>
+
+      <div>
+        <label for="category" class="block text-sm font-medium mb-1">Category</label>
+        <input
+          id="category"
+          name="category"
+          type="text"
+          value="<%= event.category || '' %>"
+          placeholder="e.g. Workshop, Social, Meeting"
+          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          <% if (!isEditable) { %>disabled<% } %>
+        />
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="startDateTime" class="block text-sm font-medium mb-1">
+            Start Date &amp; Time
+          </label>
+          <input
+            id="startDateTime"
+            name="startDateTime"
+            type="datetime-local"
+            value="<%= event.startDateTime ? new Date(event.startDateTime).toISOString().slice(0, 16) : '' %>"
+            class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+            <% if (!isEditable) { %>disabled<% } %>
+          />
+        </div>
+        <div>
+          <label for="endDateTime" class="block text-sm font-medium mb-1">
+            End Date &amp; Time
+          </label>
+          <input
+            id="endDateTime"
+            name="endDateTime"
+            type="datetime-local"
+            value="<%= event.endDateTime ? new Date(event.endDateTime).toISOString().slice(0, 16) : '' %>"
+            class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+            <% if (!isEditable) { %>disabled<% } %>
+          />
+        </div>
+      </div>
+
+      <div>
+        <label for="capacity" class="block text-sm font-medium mb-1">Capacity</label>
+        <input
+          id="capacity"
+          name="capacity"
+          type="number"
+          min="1"
+          value="<%= event.capacity || '' %>"
+          placeholder="Leave blank for unlimited"
+          class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          <% if (!isEditable) { %>disabled<% } %>
+        />
+        <p class="text-xs text-slate-400 mt-1">Optional. Must be a positive number if provided.</p>
+      </div>
+
+      <% if (isEditable) { %>
+        <div>
+          <label for="status" class="block text-sm font-medium mb-1">Status</label>
+          <select
+            id="status"
+            name="status"
+            class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500"
+          >
+            <option value="draft" <%= event.status === 'draft' ? 'selected' : '' %>>Draft</option>
+            <option value="published" <%= event.status === 'published' ? 'selected' : '' %>>Published</option>
+            <option value="cancelled" <%= event.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+          </select>
+          <p class="text-xs text-slate-400 mt-1">Changing status may affect visibility to members.</p>
+        </div>
+      <% } %>
+
+      <div class="flex gap-3 mt-1">
+        <% if (isEditable) { %>
+          <button
+            type="submit"
+            class="px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium cursor-pointer hover:bg-blue-700"
+          >
+            Save Changes
+          </button>
+        <% } %>
+        <a
+          href="/home"
+          class="px-4 py-2.5 rounded-lg bg-slate-100 text-slate-700 font-medium cursor-pointer hover:bg-slate-200 no-underline inline-block"
+        >
+          Cancel
+        </a>
+      </div>
+    </form>
+  </section>
+
+  <!-- ── Metadata section ────────────────────────────────────────────── -->
+  <section class="max-w-3xl mt-4 p-4 border border-slate-200 rounded-xl bg-slate-50">
+    <h3 class="text-sm font-semibold text-slate-600 mb-2">Event Metadata</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-500">
+      <div>
+        <span class="font-medium">Organizer:</span> <%= event.organizerId || 'Unknown' %>
+      </div>
+      <div>
+        <span class="font-medium">Created:</span> <%= event.createdAt ? new Date(event.createdAt).toLocaleString() : 'Unknown' %>
+      </div>
+      <div>
+        <span class="font-medium">Last Updated:</span> <%= event.updatedAt ? new Date(event.updatedAt).toLocaleString() : 'Unknown' %>
+      </div>
+      <div>
+        <span class="font-medium">Event ID:</span> <%= event.id %>
+      </div>
+    </div>
+  </section>
+<% } %>
+
+<!-- ── Status blurb — updated in-place by HTMX after submission ── -->
+<div id="form-status" class="max-w-3xl mt-5">
+  <% if (pageError) { %>
+    <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 font-medium">
+      <span class="mr-1">✗</span> <%= pageError %>
+    </div>
+  <% } %>
+</div>
+
+<script>
+  // ── HTMX swap handler for the edit-event form ──────────────────
+  // Forces swap on 4xx responses so validation errors appear, and
+  // injects a success banner when the controller redirects (2xx after 302).
+  document.body.addEventListener('htmx:beforeSwap', function (evt) {
+    if (!evt.detail.target || evt.detail.target.id !== 'form-status') return;
+
+    var status = evt.detail.xhr.status;
+
+    if (status >= 200 && status < 300) {
+      // Controller redirected on success — the followed redirect page
+      // won't contain #form-status, so we inject a success message and
+      // navigate after a short delay.
+      evt.detail.shouldSwap  = true;
+      evt.detail.serverResponse =
+        '<div id="form-status" class="max-w-3xl mt-5">' +
+          '<div class="p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 font-medium">' +
+            '<span class="mr-1">✓</span> Event updated successfully! Redirecting\u2026' +
+          '</div>' +
+        '</div>';
+      setTimeout(function () { window.location.href = '/home'; }, 1500);
+    } else if (status >= 400) {
+      // Validation or auth error — allow swap so the server-rendered
+      // pageError inside #form-status is shown to the user.
+      evt.detail.shouldSwap = true;
+    }
+  });
+</script>
