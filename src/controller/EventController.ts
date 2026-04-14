@@ -112,7 +112,7 @@ class EventController implements IEventController {
 
     // Capacity validation if provided
     let capacity: number | undefined;
-    if (input.capacity !== undefined) {
+    if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
       const parsed = typeof input.capacity === "number" ? input.capacity : parseInt(String(input.capacity), 10);
       if (!Number.isFinite(parsed) || parsed <= 0) {
         res.status(400);
@@ -121,7 +121,7 @@ class EventController implements IEventController {
       }
       capacity = parsed;
     }
-
+    
     // Build event object (service is responsible for id generation)
     const eventForm: Partial<IEvent> = {
       organizerId: currentUser.userId,
@@ -150,7 +150,7 @@ class EventController implements IEventController {
     }
 
     this.logger.info(`Event created ${result.value.id} by ${currentUser.userId}`);
-    res.redirect("/events");
+    res.redirect("/home");
   }
 
   async showEditEventForm(res: Response, eventId: string, session: IAppBrowserSession, pageError: string | null = null): Promise<void> {
@@ -254,7 +254,7 @@ class EventController implements IEventController {
     }
 
     // Capacity if provided
-    if (input.capacity !== undefined) {
+    if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
       const parsed = typeof input.capacity === "number" ? input.capacity : parseInt(String(input.capacity), 10);
       if (!Number.isFinite(parsed) || parsed <= 0) {
         res.status(400);
@@ -291,7 +291,7 @@ class EventController implements IEventController {
     }
 
     this.logger.info(`Event ${eventId} modified by ${currentUser.userId}`);
-    res.redirect(`/events/${eventId}`);
+    res.redirect("/home");
   }
 }
 
