@@ -1,8 +1,7 @@
 <section class="mb-5 p-6 border border-slate-200 rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-lg">
   <h1 class="text-3xl font-bold text-slate-900 mb-3">Edit Event</h1>
   <p class="text-slate-500">
-    Modify the event details below. Fields left blank will keep their current values.
-    Required fields are marked with <span class="text-red-500">*</span>.
+    Modify the event details below. Fields will be saved as shown
   </p>
   <% if (session.authenticatedUser) { %>
     <p class="text-slate-500 mt-2 mb-0">
@@ -65,7 +64,7 @@
     >
       <div>
         <label for="title" class="block text-sm font-medium mb-1">
-          Title <span class="text-red-500">*</span>
+          Title
         </label>
         <input
           id="title"
