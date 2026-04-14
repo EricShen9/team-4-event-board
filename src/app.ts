@@ -17,6 +17,7 @@ import {
   touchAppSession,
 } from "./session/AppSession";
 import { ILoggingService } from "./service/LoggingService";
+import type { IEventController } from "./controller/EventController";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -35,6 +36,7 @@ class ExpressApp implements IApp {
 
   constructor(
     private readonly authController: IAuthController,
+    private readonly eventController: IEventController,
     private readonly logger: ILoggingService,
   ) {
     this.app = express();
@@ -125,7 +127,7 @@ class ExpressApp implements IApp {
       layout: false,
     });
     return false;
-  }
+  }  
 
   private registerRoutes(): void {
     // ── Public routes ────────────────────────────────────────────────
@@ -167,6 +169,102 @@ class ExpressApp implements IApp {
       "/logout",
       asyncHandler(async (req, res) => {
         await this.authController.logoutFromForm(res, sessionStore(req));
+      }),
+    );
+
+    // ── Event creation routes ─────────────────────────────────────────
+
+    // Show the "create event" form (staff + admin only)
+    this.app.get(
+      "/events/new",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can create events.",
+          )
+        ) {
+          return;
+        }
+
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        this.logger.info(`GET /events/new for ${browserSession.browserLabel}`);
+
+        await this.eventController.showCreateEventForm(res, browserSession);
+      }),
+    );
+
+    // Handle event creation form submission (staff + admin only)
+    this.app.post(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can create events.",
+          )
+        ) {
+          return;
+        }
+
+        const store = sessionStore(req);
+        this.logger.info(`POST /events by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`);
+
+        await this.eventController.createEventFromForm(res, req.body, store);
+      }),
+    );
+
+    // Show the "edit event" form (staff + admin only)
+    this.app.get(
+      "/events/:id/edit",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can modify events.",
+          )
+        ) {
+          return;
+        }
+
+        const eventId = typeof req.params.id === "string" ? req.params.id : "";
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        this.logger.info(`GET /events/${eventId}/edit for ${browserSession.browserLabel}`);
+
+        await this.eventController.showEditEventForm(res, eventId, browserSession);
+      }),
+    );
+
+    // Handle event modification form submission (staff + admin only)
+    this.app.post(
+      "/events/:id",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can modify events.",
+          )
+        ) {
+          return;
+        }
+
+        const eventId = typeof req.params.id === "string" ? req.params.id : "";
+        const store = sessionStore(req);
+        this.logger.info(
+          `POST /events/${eventId} by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.eventController.modifyEventFromForm(res, eventId, req.body, store);
       }),
     );
 
@@ -272,7 +370,8 @@ class ExpressApp implements IApp {
 
 export function CreateApp(
   authController: IAuthController,
+  eventController: IEventController,
   logger: ILoggingService,
 ): IApp {
-  return new ExpressApp(authController, logger);
+  return new ExpressApp(authController, eventController, logger);
 }
