@@ -27,11 +27,20 @@ export interface IEventController {
 
 /**
  * Controller implementation
+ * 
+ * Notes / assumptions:
+ * - Route-level role checks should already block members; controller performs defensive checks too.
+ * - Views:
+ *   - "events/create" used to render the create page
+ *   - "events/edit" used to render the edit page
+ *   - "partials/error" used for HTMX / partial error responses
+ * - Service methods return Result<T> as defined above.
  */
 class EventController implements IEventController {
   constructor(private readonly service: IEventService, private readonly logger: ILoggingService) {}
 
   private mapErrorStatus(error: Error): number {
+    // Map some common error names to HTTP statuses; adapt to your service errors if different.
     const name = (error as any).name;
     if (name === "AuthorizationRequired") return 403;
     if (name === "EventNotFound") return 404;
