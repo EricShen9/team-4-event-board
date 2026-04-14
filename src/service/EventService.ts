@@ -2,8 +2,7 @@
 
 import { Result, Ok, Err } from "../lib/result";
 import type { ILoggingService } from "./LoggingService";
-import type { IEvent } from "../controller/EventController";
-
+import type { statusType, IEvent, IRSVP } from "../repository/EntryRepository";
 /**
  * Repository interface the service depends on.
  * Implemented by InMemoryEventRepository.
