@@ -77,6 +77,28 @@ class EventController implements IEventController {
       await this.showCreateEventForm(res, session, "Title is required.");
       return;
     }
+
+    if (!description) {
+      this.logger.warn("Modify event failed: Description is required.");
+      res.status(400);
+      await this.showCreateEventForm(res, session, "Description is required.");
+      return;
+    }
+
+    if (!location) {
+      this.logger.warn("Modify event failed: Location is required.");
+      res.status(400);
+      await this.showCreateEventForm(res, session, "Location is required.");
+      return;
+    }
+
+    if (!category) {
+      this.logger.warn("Modify event failed: Category is required.");
+      res.status(400);
+      await this.showCreateEventForm(res, session, "Category is required.");
+      return;
+    }
+
     if (!startDateTimeRaw) {
       this.logger.warn("Create event failed: Start date/time is required.");
       res.status(400);
@@ -218,63 +240,95 @@ class EventController implements IEventController {
       return;
     }
 
-    // Build patch only including provided fields and validate them
-    const patch: Partial<IEvent> = {};
-    if (typeof input.title === "string") patch.title = input.title.trim();
-    if (typeof input.description === "string") patch.description = input.description.trim();
-    if (typeof input.location === "string") patch.location = input.location.trim();
-    if (typeof input.category === "string") patch.category = input.category.trim();
+    // Extract and validate required fields
+    const title = typeof input.title === "string" ? input.title.trim() : "";
+    const description = typeof input.description === "string" ? input.description.trim() : "";
+    const location = typeof input.location === "string" ? input.location.trim() : "";
+    const category = typeof input.category === "string" ? input.category.trim() : "";
+    const startDateTimeRaw = typeof input.startDateTime === "string" ? input.startDateTime.trim() : "";
+    const endDateTimeRaw = typeof input.endDateTime === "string" ? input.endDateTime.trim() : "";
 
-    if (input.startDateTime !== undefined) {
-      const parsed = new Date(String(input.startDateTime));
-      if (Number.isNaN(parsed.getTime())) {
-        res.status(400);
-        await this.showEditEventForm(res, eventId, session, "Invalid start date/time.");
-        return;
-      }
-      // start must not be before now
-      if (parsed < now) {
-        res.status(400);
-        await this.showEditEventForm(res, eventId, session, "Start date/time cannot be in the past.");
-        return;
-      }
-      patch.startDateTime = parsed.toISOString();
+    // Required field validation (same as create)
+    if (!title) {
+      this.logger.warn("Modify event failed: Title is required.");
+      res.status(400);
+      await this.showEditEventForm(res, eventId, session, "Title is required.");
+      return;
+    }
+    if (!description) {
+      this.logger.warn("Modify event failed: Description is required.");
+      res.status(400);
+      await this.showEditEventForm(res, eventId, session, "Description is required.");
+      return;
+    }
+    if (!location) {
+      this.logger.warn("Modify event failed: Location is required.");
+      res.status(400);
+      await this.showEditEventForm(res, eventId, session, "Location is required.");
+      return;
+    }
+    if (!category) {
+      this.logger.warn("Modify event failed: Category is required.");
+      res.status(400);
+      await this.showEditEventForm(res, eventId, session, "Category is required.");
+      return;
+    }
+    if (!startDateTimeRaw) {
+      this.logger.warn("Modify event failed: Start date/time is required.");
+      res.status(400);
+      await this.showEditEventForm(res, eventId, session, "Start date/time is required.");
+      return;
+    }
+    if (!endDateTimeRaw) {
+      this.logger.warn("Modify event failed: End date/time is required.");
+      res.status(400);
+      await this.showEditEventForm(res, eventId, session, "End date/time is required.");
+      return;
     }
 
-    if (input.endDateTime !== undefined) {
-      const parsed = new Date(String(input.endDateTime));
-      if (Number.isNaN(parsed.getTime())) {
-        res.status(400);
-        await this.showEditEventForm(res, eventId, session, "Invalid end date/time.");
-        return;
-      }
-      patch.endDateTime = parsed.toISOString();
+    // Parse and validate dates
+    const startDate = new Date(startDateTimeRaw);
+    const endDate = new Date(endDateTimeRaw);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      this.logger.warn("Modify event failed: Invalid date/time format.");
+      res.status(400);
+      await this.showEditEventForm(res, eventId, session, "Invalid date/time format.");
+      return;
     }
 
-    // If both start & end provided, check chronology. If only one provided, compare with existing value.
-    const effectiveStart = patch.startDateTime ? new Date(patch.startDateTime) : new Date(existing.startDateTime);
-    const effectiveEnd = patch.endDateTime ? new Date(patch.endDateTime) : new Date(existing.endDateTime);
-    if (effectiveStart >= effectiveEnd) {
+    if (startDate < now) {
+      this.logger.warn("Modify event failed: Start date/time cannot be in the past.");
+      res.status(400);
+      await this.showEditEventForm(res, eventId, session, "Start date/time cannot be in the past.");
+      return;
+    }
+
+    if (startDate >= endDate) {
+      this.logger.warn("Modify event failed: Event start must be before end time.");
       res.status(400);
       await this.showEditEventForm(res, eventId, session, "Event start must be before end time.");
       return;
     }
 
-    // Capacity if provided
+    // Capacity validation if provided
+    let capacity: number | undefined;
     if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
       const parsed = typeof input.capacity === "number" ? input.capacity : parseInt(String(input.capacity), 10);
       if (!Number.isFinite(parsed) || parsed <= 0) {
+        this.logger.warn("Create event failed: Capacity must be a positive non-zero number.");
         res.status(400);
-        await this.showEditEventForm(res, eventId, session, "Capacity must be a positive non-zero number.");
+        await this.showCreateEventForm(res, session, "Capacity must be a positive non-zero number.");
         return;
       }
-      patch.capacity = parsed;
+      capacity = parsed;
     }
 
-    // Status transition allowed by service; we still accept explicit status if well-formed
+    // Status validation
+    let status: statusType | undefined;
     if (input.status !== undefined) {
       if (input.status === "published" || input.status === "draft" || input.status === "cancelled" || input.status === "past") {
-        patch.status = input.status;
+        status = input.status;
       } else {
         res.status(400);
         await this.showEditEventForm(res, eventId, session, "Invalid status.");
@@ -282,7 +336,21 @@ class EventController implements IEventController {
       }
     }
 
-    patch.updatedAt = new Date().toISOString();
+    // Build patch with all fields (they will overwrite existing values)
+    const patch: Partial<IEvent> = {
+      title,
+      description,
+      location,
+      category,
+      startDateTime: startDate.toISOString(),
+      endDateTime: endDate.toISOString(),
+      capacity,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (status !== undefined) {
+      patch.status = status;
+    }
 
     // Delegate to service
     const result = await this.service.modifyEvent(eventId, patch);
