@@ -18,9 +18,9 @@ class EventService implements IEventService {
     private readonly repository: IEventRepository,
     private readonly logger: ILoggingService,
   ) {}
-
+  private nextId: number = 1;
   private generateId(): string {
-    return `evt-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    return `${this.nextId++}`;
   }
 
   async createEvent(eventForm: Partial<IEvent>): Promise<Result<IEvent, Error>> {
