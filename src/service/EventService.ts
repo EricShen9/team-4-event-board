@@ -98,9 +98,13 @@ class EventService implements IEventService {
     return Err(new Error("Not implemented."));
   }
 
-  async getEvent(_eventId: string): Promise<Result<IEvent, Error>> {
-    this.logger.warn("getEvent is not yet implemented.");
-    return Err(new Error("Not implemented."));
+  async getEvent(eventId: string): Promise<Result<IEvent, Error>> {
+    if (!eventId || eventId.trim() === "") {
+      this.logger.warn("getEvent: eventId is required.");
+      return Err(new Error("Event ID is required."));
+    }
+
+    return this.repository.getEvent(eventId);
   }
 }
 
