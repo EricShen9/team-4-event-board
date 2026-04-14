@@ -23,16 +23,35 @@ class InMemoryEventRepository implements IEventRepository {
   // ── Stubs — to be implemented later ────────────────────────────────
 
   async editEvent(
-    _eventId: string,
-    _event: IEvent,
+    eventId: string,
+    event: IEvent,
   ): Promise<Result<IEvent, Error>> {
-    this.logger.warn("editEvent is not yet implemented.");
-    return Err(new Error("Not implemented."));
+    if (!this.events.has(eventId)) {
+      this.logger.warn(`editEvent: event with id ${eventId} not found.`);
+      return Err(new Error(`Event with id ${eventId} not found.`));
+    }
+
+    // Ensure the event being saved has the correct ID
+    if (event.id !== eventId) {
+      this.logger.warn(`editEvent: event id mismatch (${event.id} vs ${eventId}).`);
+      return Err(new Error("Event ID mismatch."));
+    }
+
+    this.events.set(eventId, event);
+    this.logger.info(`editEvent: updated event ${eventId} ("${event.title}").`);
+    return Ok(event);
   }
 
-  async getEvent(_eventId: string): Promise<Result<IEvent, Error>> {
-    this.logger.warn("getEvent is not yet implemented.");
-    return Err(new Error("Not implemented."));
+  async getEvent(eventId: string): Promise<Result<IEvent, Error>> {
+    const event = this.events.get(eventId);
+    
+    if (!event) {
+      this.logger.warn(`getEvent: event with id ${eventId} not found.`);
+      return Err(new Error(`Event with id ${eventId} not found.`));
+    }
+
+    this.logger.info(`getEvent: retrieved event ${eventId}.`);
+    return Ok(event);
   }
 }
 
