@@ -8,7 +8,8 @@ import {
   type AppSessionStore,
 } from "../session/AppSession";
 import type { ILoggingService } from "../service/LoggingService";
-
+import type { Result } from "../lib/result";
+import type { IEventService } from "../service/EventService";
 /**
  * Domain types (adapted to valid TypeScript from provided shapes)
  */
@@ -38,20 +39,7 @@ export interface IRSVP {
   createdAt: string;
 }
 
-/**
- * Result wrapper used by services (same shape as AuthController uses)
- */
-type Result<T, E = Error> = { ok: true; value: T } | { ok: false; value: E };
 
-/**
- * Minimal EventService interface expected by the controller.
- * Implementations should return Result<T> objects as above.
- */
-export interface IEventService {
-  createEvent(eventForm: Partial<IEvent>): Promise<Result<IEvent, Error>>;
-  modifyEvent(eventId: string, patch: Partial<IEvent>): Promise<Result<IEvent, Error>>;
-  getEvent(eventId: string): Promise<Result<IEvent, Error>>;
-}
 
 /**
  * Controller interface
