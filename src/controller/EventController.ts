@@ -10,7 +10,7 @@ import {
 import type { ILoggingService } from "../service/LoggingService";
 import type { Result } from "../lib/result";
 import type { IEventService } from "../service/EventService";
-import type { statusType, IEvent, IRSVP } from "../repository/EntryRepository";
+import type { statusType, IEvent, IRSVP } from "../repository/EventRepository";
 
 
 /**
