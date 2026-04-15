@@ -57,7 +57,7 @@ class EventController implements IEventController {
   async createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void> {
     const session = touchAppSession(store);
     const currentUser = getAuthenticatedUser(store);
-
+    // Controller responsibility: Check for mandatory fields (non-empty)
     const title = typeof input.title === "string" ? input.title.trim() : "";
     const description = typeof input.description === "string" ? input.description.trim() : "";
     const location = typeof input.location === "string" ? input.location.trim() : "";
@@ -101,10 +101,17 @@ class EventController implements IEventController {
       await this.showCreateEventForm(res, session, "End date/time is required.");
       return;
     }
-
+    // Parse dates for service 
     const startDate = new Date(startDateTimeRaw);
     const endDate = new Date(endDateTimeRaw);
     const createdAt = new Date();
+    // Handle capacity conversion (empty = undefined)
+    let capacity: number | undefined;
+    if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
+      capacity = typeof input.capacity === "number" 
+        ? input.capacity 
+        : parseInt(String(input.capacity), 10);
+    }
 
     const eventForm: Partial<IEvent> = {
       organizerId: currentUser!.userId,
@@ -115,9 +122,7 @@ class EventController implements IEventController {
       status: "draft",
       startDateTime: startDate.toISOString(),
       endDateTime: endDate.toISOString(),
-      capacity: input.capacity !== undefined && String(input.capacity).trim() !== "" 
-        ? (typeof input.capacity === "number" ? input.capacity : parseInt(String(input.capacity), 10))
-        : undefined,
+      capacity,
       createdAt: createdAt.toISOString(),
       updatedAt: createdAt.toISOString(),
     };
@@ -154,49 +159,14 @@ class EventController implements IEventController {
   async modifyEventFromForm(res: Response, eventId: string, input: Partial<IEvent>, store: AppSessionStore): Promise<void> {
     const session = touchAppSession(store);
     const currentUser = getAuthenticatedUser(store);
-
-    // Defensive role check
-    if (!currentUser || (currentUser.role !== "staff" && currentUser.role !== "admin")) {
-      const msg = "Only Staff or Admin can modify events.";
-      this.logger.warn(`Blocked event modification attempt by ${currentUser?.role ?? "unauthenticated"}`);
-      res.status(403).render("partials/error", { message: msg, layout: false });
-      return;
-    }
-
+    // Controller responsibility: Check for eventId
     if (!eventId) {
       res.status(400);
       await this.showEditEventForm(res, eventId, session, "Missing event id.");
       return;
     }
 
-    // Fetch existing event to apply business rules
-    const existingRes = await this.service.getEvent(eventId);
-    if (existingRes.ok === false) {
-      const err = existingRes.value;
-      const status = this.mapErrorStatus(err);
-      this.logger.warn(`Failed to fetch event ${eventId} for modification: ${err.message}`);
-      res.status(status);
-      await this.showEditEventForm(res, eventId, session, err.message);
-      return;
-    }
-
-    const existing = existingRes.value;
-
-    // No edits allowed to cancelled or past events
-    if (existing.status === "cancelled") {
-      res.status(409);
-      await this.showEditEventForm(res, eventId, session, "Cannot modify a cancelled event.");
-      return;
-    }
-    const now = new Date();
-    const existingStart = new Date(existing.startDateTime);
-    if (existingStart < now) {
-      res.status(409);
-      await this.showEditEventForm(res, eventId, session, "Cannot modify a past event.");
-      return;
-    }
-
-    // Extract and validate required fields
+    // Controller responsibility: Check for mandatory fields (non-empty)
     const title = typeof input.title === "string" ? input.title.trim() : "";
     const description = typeof input.description === "string" ? input.description.trim() : "";
     const location = typeof input.location === "string" ? input.location.trim() : "";
@@ -204,7 +174,6 @@ class EventController implements IEventController {
     const startDateTimeRaw = typeof input.startDateTime === "string" ? input.startDateTime.trim() : "";
     const endDateTimeRaw = typeof input.endDateTime === "string" ? input.endDateTime.trim() : "";
 
-    // Required field validation (same as create)
     if (!title) {
       this.logger.warn("Modify event failed: Title is required.");
       res.status(400);
@@ -242,57 +211,19 @@ class EventController implements IEventController {
       return;
     }
 
-    // Parse and validate dates
+    // Parse dates for service 
     const startDate = new Date(startDateTimeRaw);
     const endDate = new Date(endDateTimeRaw);
 
-    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-      this.logger.warn("Modify event failed: Invalid date/time format.");
-      res.status(400);
-      await this.showEditEventForm(res, eventId, session, "Invalid date/time format.");
-      return;
-    }
-
-    if (startDate < now) {
-      this.logger.warn("Modify event failed: Start date/time cannot be in the past.");
-      res.status(400);
-      await this.showEditEventForm(res, eventId, session, "Start date/time cannot be in the past.");
-      return;
-    }
-
-    if (startDate >= endDate) {
-      this.logger.warn("Modify event failed: Event start must be before end time.");
-      res.status(400);
-      await this.showEditEventForm(res, eventId, session, "Event start must be before end time.");
-      return;
-    }
-
-    // Capacity validation if provided
+    // Handle capacity conversion (empty = undefined)
     let capacity: number | undefined;
     if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
-      const parsed = typeof input.capacity === "number" ? input.capacity : parseInt(String(input.capacity), 10);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        this.logger.warn("Create event failed: Capacity must be a positive non-zero number.");
-        res.status(400);
-        await this.showCreateEventForm(res, session, "Capacity must be a positive non-zero number.");
-        return;
-      }
-      capacity = parsed;
+      capacity = typeof input.capacity === "number" 
+        ? input.capacity 
+        : parseInt(String(input.capacity), 10);
     }
 
-    // Status validation
-    let status: statusType | undefined;
-    if (input.status !== undefined) {
-      if (input.status === "published" || input.status === "draft" || input.status === "cancelled" || input.status === "past") {
-        status = input.status;
-      } else {
-        res.status(400);
-        await this.showEditEventForm(res, eventId, session, "Invalid status.");
-        return;
-      }
-    }
-
-    // Build patch with all fields (they will overwrite existing values)
+    // Build patch with raw data - service will validate everything
     const patch: Partial<IEvent> = {
       title,
       description,
@@ -304,11 +235,11 @@ class EventController implements IEventController {
       updatedAt: new Date().toISOString(),
     };
 
-    if (status !== undefined) {
-      patch.status = status;
+    // Include status if provided (service will validate)
+    if (input.status !== undefined) {
+      patch.status = input.status;
     }
 
-    // Delegate to service
     const result = await this.service.modifyEvent(eventId, patch);
 
     if (result.ok === false) {
@@ -321,7 +252,7 @@ class EventController implements IEventController {
       return;
     }
 
-    this.logger.info(`Event ${eventId} modified by ${currentUser.userId}`);
+    this.logger.info(`Event ${eventId} modified by ${currentUser!.userId}`);
     res.redirect("/home");
   }
 
