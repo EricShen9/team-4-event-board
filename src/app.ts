@@ -268,6 +268,59 @@ class ExpressApp implements IApp {
       }),
     );
 
+
+    // ── Event lifecycle routes (publish / cancel) ─────────────────────
+
+    // Publish a draft event (staff + admin, but service enforces ownership)
+    this.app.post(
+      "/events/:id/publish",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can publish events.",
+          )
+        ) {
+          return;
+        }
+
+        const eventId = typeof req.params.id === "string" ? req.params.id : "";
+        const store = sessionStore(req);
+        this.logger.info(
+          `POST /events/${eventId}/publish by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.eventController.publishEvent(res, eventId, store);
+      }),
+    );
+
+    // Cancel a published event (staff + admin, but service enforces ownership / admin override)
+    this.app.post(
+      "/events/:id/cancel",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can cancel events.",
+          )
+        ) {
+          return;
+        }
+
+        const eventId = typeof req.params.id === "string" ? req.params.id : "";
+        const store = sessionStore(req);
+        this.logger.info(
+          `POST /events/${eventId}/cancel by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.eventController.cancelEvent(res, eventId, store);
+      }),
+    );
+
     // ── Admin routes ─────────────────────────────────────────────────
 
     this.app.get(

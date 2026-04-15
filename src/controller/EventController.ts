@@ -21,11 +21,13 @@ export interface IEventController {
   createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
   showEditEventForm(res: Response, eventId: string, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
   modifyEventFromForm(res: Response, eventId: string, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
+  publishEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void>;
+  cancelEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void>;
 }
 
 /**
  * Controller implementation
- *
+ * 
  * Notes / assumptions:
  * - Route-level role checks should already block members; controller performs defensive checks too.
  * - Views:
@@ -43,6 +45,7 @@ class EventController implements IEventController {
     if (name === "AuthorizationRequired") return 403;
     if (name === "EventNotFound") return 404;
     if (name === "ValidationError" || name === "InvalidInput") return 400;
+    if (name === "InvalidStateTransition") return 409;
     if (name === "ConflictError") return 409;
     return 500;
   }
@@ -366,6 +369,58 @@ class EventController implements IEventController {
     }
 
     this.logger.info(`Event ${eventId} modified by ${currentUser.userId}`);
+    res.redirect("/home");
+  }
+
+  // ── Lifecycle transitions (Feature 5, Sprint 1) ───────────────────
+
+  async publishEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void> {
+    const session = touchAppSession(store);
+    const currentUser = getAuthenticatedUser(store);
+
+    if (!currentUser || (currentUser.role !== "staff" && currentUser.role !== "admin")) {
+      const msg = "Only Staff or Admin can publish events.";
+      this.logger.warn(`Blocked publish attempt by ${currentUser?.role ?? "unauthenticated"}`);
+      res.status(403).render("partials/error", { message: msg, layout: false });
+      return;
+    }
+
+    const result = await this.service.publishEvent(eventId, currentUser.userId, currentUser.role);
+
+    if (result.ok === false) {
+      const err = result.value;
+      const httpStatus = this.mapErrorStatus(err);
+      this.logger.warn(`Publish event ${eventId} failed: ${err.message}`);
+      res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+      return;
+    }
+
+    this.logger.info(`Event ${eventId} published by ${currentUser.userId}`);
+    res.redirect("/home");
+  }
+
+  async cancelEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void> {
+    const session = touchAppSession(store);
+    const currentUser = getAuthenticatedUser(store);
+
+    if (!currentUser || (currentUser.role !== "staff" && currentUser.role !== "admin")) {
+      const msg = "Only Staff or Admin can cancel events.";
+      this.logger.warn(`Blocked cancel attempt by ${currentUser?.role ?? "unauthenticated"}`);
+      res.status(403).render("partials/error", { message: msg, layout: false });
+      return;
+    }
+
+    const result = await this.service.cancelEvent(eventId, currentUser.userId, currentUser.role);
+
+    if (result.ok === false) {
+      const err = result.value;
+      const httpStatus = this.mapErrorStatus(err);
+      this.logger.warn(`Cancel event ${eventId} failed: ${err.message}`);
+      res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+      return;
+    }
+
+    this.logger.info(`Event ${eventId} cancelled by ${currentUser.userId}`);
     res.redirect("/home");
   }
 }
