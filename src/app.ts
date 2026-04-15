@@ -321,6 +321,30 @@ class ExpressApp implements IApp {
       }),
     );
 
+    // Show the organizer dashboard (staff + admin only; members rejected at route level)
+    this.app.get(
+      "/organizer-dashboard",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can access the organizer dashboard.",
+          )
+        ) {
+          return;
+        }
+
+        const store = sessionStore(req);
+        this.logger.info(
+          `GET /organizer-dashboard by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.eventController.showOrganizerDashboard(res, store);
+      }),
+    );
+
     // ── Admin routes ─────────────────────────────────────────────────
 
     this.app.get(
