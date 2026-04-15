@@ -85,30 +85,28 @@ class EventService implements IEventService {
     }
 
     const existing = existingResult.value;
-
-    // Validate date changes if provided
     const now = new Date();
-    const effectiveStart = patch.startDateTime
-      ? new Date(patch.startDateTime)
-      : new Date(existing.startDateTime);
-    const effectiveEnd = patch.endDateTime
-      ? new Date(patch.endDateTime)
-      : new Date(existing.endDateTime);
 
-    // Start date validation (if changed)
+    // Service responsibility: Validate state-based rules first
+    if (existing.status === "cancelled") {
+      this.logger.warn("modifyEvent: cannot modify cancelled event.");
+      return Err(new Error("Cannot modify a cancelled event."));
+    }
+    
+    if (new Date(existing.startDateTime) < now) {
+      this.logger.warn("modifyEvent: cannot modify past event.");
+      return Err(new Error("Cannot modify a past event."));
+    }
+
+    // Service responsibility: Date format validation (if provided)
     if (patch.startDateTime) {
       const newStart = new Date(patch.startDateTime);
       if (Number.isNaN(newStart.getTime())) {
         this.logger.warn("modifyEvent: invalid start date/time format.");
         return Err(new Error("Invalid start date/time format."));
       }
-      if (newStart < now) {
-        this.logger.warn("modifyEvent: start date cannot be in the past.");
-        return Err(new Error("Start date/time cannot be in the past."));
-      }
     }
 
-    // End date validation (if changed)
     if (patch.endDateTime) {
       const newEnd = new Date(patch.endDateTime);
       if (Number.isNaN(newEnd.getTime())) {
@@ -117,13 +115,26 @@ class EventService implements IEventService {
       }
     }
 
-    // Chronology validation
+    // Service responsibility: Chronology validation
+    const effectiveStart = patch.startDateTime
+      ? new Date(patch.startDateTime)
+      : new Date(existing.startDateTime);
+    const effectiveEnd = patch.endDateTime
+      ? new Date(patch.endDateTime)
+      : new Date(existing.endDateTime);
+
     if (effectiveStart >= effectiveEnd) {
       this.logger.warn("modifyEvent: start must be before end.");
       return Err(new Error("Event start must be before end time."));
     }
 
-    // Capacity validation (if changed)
+    // Service responsibility: Past date validation (if changed)
+    if (patch.startDateTime && effectiveStart < now) {
+      this.logger.warn("modifyEvent: start date cannot be in the past.");
+      return Err(new Error("Start date/time cannot be in the past."));
+    }
+
+    // Service responsibility: Capacity validation (if provided)
     if (patch.capacity !== undefined) {
       if (
         typeof patch.capacity !== "number" ||
@@ -135,24 +146,12 @@ class EventService implements IEventService {
       }
     }
 
-    // Status transition validation
+    // Service responsibility: Status validation (if provided)
     if (patch.status !== undefined) {
       const validStatuses: statusType[] = ["draft", "published", "cancelled", "past"];
       if (!validStatuses.includes(patch.status)) {
         this.logger.warn(`modifyEvent: invalid status ${patch.status}.`);
         return Err(new Error("Invalid status."));
-      }
-
-      // Prevent modification of cancelled events
-      if (existing.status === "cancelled") {
-        this.logger.warn("modifyEvent: cannot modify cancelled event.");
-        return Err(new Error("Cannot modify a cancelled event."));
-      }
-
-      // Prevent modification of past events
-      if (existing.status === "past" || new Date(existing.startDateTime) < now) {
-        this.logger.warn("modifyEvent: cannot modify past event.");
-        return Err(new Error("Cannot modify a past event."));
       }
     }
 
@@ -164,7 +163,7 @@ class EventService implements IEventService {
       updatedAt: patch.updatedAt || new Date().toISOString(),
     };
 
-    // If startDateTime passed and event is past, auto-set status
+    // Auto-set status to "past" if start date has passed
     if (new Date(updatedEvent.startDateTime) < new Date()) {
       updatedEvent.status = "past";
     }
