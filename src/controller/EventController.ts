@@ -58,15 +58,6 @@ class EventController implements IEventController {
     const session = touchAppSession(store);
     const currentUser = getAuthenticatedUser(store);
 
-    // Defensive role check
-    if (!currentUser || (currentUser.role !== "staff" && currentUser.role !== "admin")) {
-      const msg = "Only Staff or Admin can create events.";
-      this.logger.warn(`Blocked event creation attempt by ${currentUser?.role ?? "unauthenticated"}`);
-      res.status(403).render("partials/error", { message: msg, layout: false });
-      return;
-    }
-
-    // Required fields
     const title = typeof input.title === "string" ? input.title.trim() : "";
     const description = typeof input.description === "string" ? input.description.trim() : "";
     const location = typeof input.location === "string" ? input.location.trim() : "";
@@ -80,28 +71,24 @@ class EventController implements IEventController {
       await this.showCreateEventForm(res, session, "Title is required.");
       return;
     }
-
     if (!description) {
-      this.logger.warn("Modify event failed: Description is required.");
+      this.logger.warn("Create event failed: Description is required.");
       res.status(400);
       await this.showCreateEventForm(res, session, "Description is required.");
       return;
     }
-
     if (!location) {
-      this.logger.warn("Modify event failed: Location is required.");
+      this.logger.warn("Create event failed: Location is required.");
       res.status(400);
       await this.showCreateEventForm(res, session, "Location is required.");
       return;
     }
-
     if (!category) {
-      this.logger.warn("Modify event failed: Category is required.");
+      this.logger.warn("Create event failed: Category is required.");
       res.status(400);
       await this.showCreateEventForm(res, session, "Category is required.");
       return;
     }
-
     if (!startDateTimeRaw) {
       this.logger.warn("Create event failed: Start date/time is required.");
       res.status(400);
@@ -115,48 +102,12 @@ class EventController implements IEventController {
       return;
     }
 
-    // Parse datetimes and validate chronology
-    const createdAt = new Date();
     const startDate = new Date(startDateTimeRaw);
     const endDate = new Date(endDateTimeRaw);
+    const createdAt = new Date();
 
-    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-      this.logger.warn("Create event failed: Invalid date/time format.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "Invalid date/time format.");
-      return;
-    }
-
-    if (startDate < createdAt) {
-      this.logger.warn("Create event failed: Event start cannot be before creation time.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "Event start cannot be before creation time.");
-      return;
-    }
-
-    if (startDate >= endDate) {
-      this.logger.warn("Create event failed: Event start must be before end time.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "Event start must be before end time.");
-      return;
-    }
-
-    // Capacity validation if provided
-    let capacity: number | undefined;
-    if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
-      const parsed = typeof input.capacity === "number" ? input.capacity : parseInt(String(input.capacity), 10);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        this.logger.warn("Create event failed: Capacity must be a positive non-zero number.");
-        res.status(400);
-        await this.showCreateEventForm(res, session, "Capacity must be a positive non-zero number.");
-        return;
-      }
-      capacity = parsed;
-    }
-    
-    // Build event object (service is responsible for id generation)
     const eventForm: Partial<IEvent> = {
-      organizerId: currentUser.userId,
+      organizerId: currentUser!.userId,
       title,
       description,
       location,
@@ -164,7 +115,9 @@ class EventController implements IEventController {
       status: "draft",
       startDateTime: startDate.toISOString(),
       endDateTime: endDate.toISOString(),
-      capacity,
+      capacity: input.capacity !== undefined && String(input.capacity).trim() !== "" 
+        ? (typeof input.capacity === "number" ? input.capacity : parseInt(String(input.capacity), 10))
+        : undefined,
       createdAt: createdAt.toISOString(),
       updatedAt: createdAt.toISOString(),
     };
@@ -181,7 +134,7 @@ class EventController implements IEventController {
       return;
     }
 
-    this.logger.info(`Event created ${result.value.id} by ${currentUser.userId}`);
+    this.logger.info(`Event created ${result.value.id} by ${currentUser!.userId}`);
     res.redirect("/home");
   }
 
