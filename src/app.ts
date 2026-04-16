@@ -18,6 +18,7 @@ import {
 } from "./session/AppSession";
 import { ILoggingService } from "./service/LoggingService";
 import type { IEventController } from "./controller/EventController";
+import type { IRSVPController } from "./controller/RSVPController";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -37,6 +38,7 @@ class ExpressApp implements IApp {
   constructor(
     private readonly authController: IAuthController,
     private readonly eventController: IEventController,
+    private readonly rsvpController: IRSVPController,
     private readonly logger: ILoggingService,
   ) {
     this.app = express();
@@ -378,6 +380,22 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.get(
+      "/my-rsvps",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const store = sessionStore(req);
+        this.logger.info(
+          `GET /my-rsvps for ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.rsvpController.getMyRSVPDashboardFromRequest(res, store);
+      }),
+    );
+
     this.app.post(
       "/admin/users",
       asyncHandler(async (req, res) => {
@@ -467,7 +485,8 @@ class ExpressApp implements IApp {
 export function CreateApp(
   authController: IAuthController,
   eventController: IEventController,
+  rsvpController: IRSVPController,
   logger: ILoggingService,
 ): IApp {
-  return new ExpressApp(authController, eventController, logger);
+  return new ExpressApp(authController, eventController, rsvpController, logger);
 }
