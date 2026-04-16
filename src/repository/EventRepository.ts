@@ -32,4 +32,6 @@ export interface IEventRepository {
   editEvent(eventId: string, event: IEvent): Promise<Result<IEvent, Error>>;
   getEvent(eventId: string): Promise<Result<IEvent, Error>>;
   searchEvents(term: string): Promise<Result<IEvent[], Error>>;
+  getAllEvents(): Promise<Result<IEvent[], Error>>;
 }
+
