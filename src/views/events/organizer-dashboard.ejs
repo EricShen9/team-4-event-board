@@ -1,0 +1,85 @@
+<h1>Organizer Dashboard</h1>
+
+<% if (pageError) { %>
+  <p style="color: red;"><%= pageError %></p>
+<% } %>
+
+<h2>Published (<%= published.length %>)</h2>
+<% if (published.length === 0) { %>
+  <p>No published events.</p>
+<% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Date</th>
+        <th>Category</th>
+        <th>Attending / Capacity</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% published.forEach(function(row) { %>
+        <tr>
+          <td><%= row.event.title %></td>
+          <td><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
+          <td><%= row.event.category %></td>
+          <td><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
+
+<h2>Draft (<%= draft.length %>)</h2>
+<% if (draft.length === 0) { %>
+  <p>No draft events.</p>
+<% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Date</th>
+        <th>Category</th>
+        <th>Attending / Capacity</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% draft.forEach(function(row) { %>
+        <tr>
+          <td><%= row.event.title %></td>
+          <td><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
+          <td><%= row.event.category %></td>
+          <td><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
+
+<h2>Cancelled / Past (<%= cancelledOrPast.length %>)</h2>
+<% if (cancelledOrPast.length === 0) { %>
+  <p>No cancelled or past events.</p>
+<% } else { %>
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Date</th>
+        <th>Category</th>
+        <th>Status</th>
+        <th>Attending / Capacity</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% cancelledOrPast.forEach(function(row) { %>
+        <tr>
+          <td><%= row.event.title %></td>
+          <td><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
+          <td><%= row.event.category %></td>
+          <td><%= row.event.status %></td>
+          <td><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+<% } %>
