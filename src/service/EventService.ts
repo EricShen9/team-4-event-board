@@ -12,6 +12,7 @@ export interface IEventService {
   createEvent(eventForm: Partial<IEvent>): Promise<Result<IEvent, Error>>;
   modifyEvent(eventId: string, patch: Partial<IEvent>): Promise<Result<IEvent, Error>>;
   getEvent(eventId: string): Promise<Result<IEvent, Error>>;
+  searchEvents(term: string): Promise<Result<IEvent[], Error>>;
   publishEvent(eventId: string, userId: string, userRole: UserRole): Promise<Result<IEvent, Error>>;
   cancelEvent(eventId: string, userId: string, userRole: UserRole): Promise<Result<IEvent, Error>>;
   getOrganizerEvents(organizerId: string): Promise<Result<IEvent[], Error>>;
@@ -180,6 +181,18 @@ class EventService implements IEventService {
     }
 
     return this.repository.getEvent(eventId);
+  }
+    async searchEvents(term: string): Promise<Result<IEvent[], Error>> {
+    const normalizedTerm = term.trim();
+
+    if (normalizedTerm.length > 200) {
+      this.logger.warn("searchEvents: search query is too long.");
+      const err = new Error("Search query is too long.");
+      (err as Error & { name: string }).name = "ValidationError";
+      return Err(err);
+    }
+
+    return this.repository.searchEvents(normalizedTerm);
   }
 
   // ── Lifecycle transitions (Feature 5, Sprint 1) ───────────────────

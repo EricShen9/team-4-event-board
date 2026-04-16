@@ -17,6 +17,7 @@ import type { statusType, IEvent, IRSVP } from "../repository/EventRepository";
  * Controller interface
  */
 export interface IEventController {
+  showSearchPage(res: Response, session: IAppBrowserSession, query: string, pageError?: string | null): Promise<void>;
   showCreateEventForm(res: Response, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
   createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
   showEditEventForm(res: Response, eventId: string, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
@@ -310,6 +311,34 @@ class EventController implements IEventController {
 
     this.logger.info(`Event ${eventId} modified by ${currentUser!.userId}`);
     res.redirect("/home");
+  }
+    async showSearchPage(
+    res: Response,
+    session: IAppBrowserSession,
+    query: string,
+    pageError: string | null = null,
+  ): Promise<void> {
+    const result = await this.service.searchEvents(query);
+
+    if (result.ok === false) {
+      const err = result.value;
+      const status = this.mapErrorStatus(err);
+      this.logger.warn(`Search events failed: ${err.message}`);
+      res.status(status).render("events/search", {
+        session,
+        pageError: err.message,
+        query,
+        events: [],
+      });
+      return;
+    }
+
+    res.render("events/search", {
+      session,
+      pageError,
+      query,
+      events: result.value,
+    });
   }
 
   // ── Lifecycle transitions (Feature 5, Sprint 1) ───────────────────
