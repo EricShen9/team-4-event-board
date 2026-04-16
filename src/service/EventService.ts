@@ -18,6 +18,29 @@ export interface IEventService {
   filterEvents(filters: { category?: string; timeframe?: string }): Promise<Result<IEvent[], Error>>;
 }
 
+// Helper functions for date range calculations
+function getWeekRange(now: Date): { start: Date; end: Date } {
+  const dayOfWeek = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { start: monday, end: sunday };
+}
+
+function getWeekendRange(now: Date): { start: Date; end: Date } {
+  const dayOfWeek = now.getDay();
+  const saturday = new Date(now);
+  saturday.setDate(now.getDate() + (6 - dayOfWeek));
+  saturday.setHours(0, 0, 0, 0);
+  const sunday = new Date(saturday);
+  sunday.setDate(saturday.getDate() + 1);
+  sunday.setHours(23, 59, 59, 999);
+  return { start: saturday, end: sunday };
+}
+
 class EventService implements IEventService {
   constructor(
     private readonly repository: IEventRepository,
