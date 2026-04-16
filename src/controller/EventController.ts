@@ -25,6 +25,8 @@ export interface IEventController {
   publishEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void>;
   cancelEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void>;
   showOrganizerDashboard(res: Response, store: AppSessionStore): Promise<void>;
+  showEventDetail(res: Response, eventId: string, store: AppSessionStore, pageError?: string | null): Promise<void>;
+  showEventList(res: Response, store: AppSessionStore, category?: string, timeframe?: string, pageError?: string | null): Promise<void>;
 }
 
 /**
