@@ -17,6 +17,8 @@ import {
   touchAppSession,
 } from "./session/AppSession";
 import { ILoggingService } from "./service/LoggingService";
+import type { IEventController } from "./controller/EventController";
+import type { IRSVPController } from "./controller/RSVPController";
 
 type AsyncRequestHandler = RequestHandler;
 
@@ -35,6 +37,8 @@ class ExpressApp implements IApp {
 
   constructor(
     private readonly authController: IAuthController,
+    private readonly eventController: IEventController,
+    private readonly rsvpController: IRSVPController,
     private readonly logger: ILoggingService,
   ) {
     this.app = express();
@@ -125,7 +129,7 @@ class ExpressApp implements IApp {
       layout: false,
     });
     return false;
-  }
+  }  
 
   private registerRoutes(): void {
     // ── Public routes ────────────────────────────────────────────────
@@ -170,6 +174,216 @@ class ExpressApp implements IApp {
       }),
     );
 
+    // ── Event creation routes ─────────────────────────────────────────
+
+    // Show the "create event" form (staff + admin only)
+    this.app.get(
+      "/events/new",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can create events.",
+          )
+        ) {
+          return;
+        }
+
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        this.logger.info(`GET /events/new for ${browserSession.browserLabel}`);
+
+        await this.eventController.showCreateEventForm(res, browserSession);
+      }),
+    );
+
+    // Handle event creation form submission (staff + admin only)
+    this.app.post(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can create events.",
+          )
+        ) {
+          return;
+        }
+
+        const store = sessionStore(req);
+        this.logger.info(`POST /events by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`);
+
+        await this.eventController.createEventFromForm(res, req.body, store);
+      }),
+    );
+
+    // Show the "edit event" form (staff + admin only)
+    this.app.get(
+      "/events/:id/edit",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can modify events.",
+          )
+        ) {
+          return;
+        }
+
+        const eventId = typeof req.params.id === "string" ? req.params.id : "";
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        this.logger.info(`GET /events/${eventId}/edit for ${browserSession.browserLabel}`);
+
+        await this.eventController.showEditEventForm(res, eventId, browserSession);
+      }),
+    );
+
+    this.app.post(
+  "/events/:id/rsvp",
+  asyncHandler(async (req, res) => {
+    if (!this.requireAuthenticated(req, res)) {
+      return;
+    }
+
+    const eventId = typeof req.params.id === "string" ? req.params.id : "";
+    const store = sessionStore(req);
+
+    await this.rsvpController.toggleRSVPFromRequest(
+      res,
+      eventId,
+      store,
+    );
+  }),
+);
+
+    // Handle event modification form submission (staff + admin only)
+    this.app.post(
+      "/events/:id",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can modify events.",
+          )
+        ) {
+          return;
+        }
+
+        const eventId = typeof req.params.id === "string" ? req.params.id : "";
+        const store = sessionStore(req);
+        this.logger.info(
+          `POST /events/${eventId} by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.eventController.modifyEventFromForm(res, eventId, req.body, store);
+      }),
+    );
+
+      // ── Event search route ───────────────────────────────────────────
+
+    this.app.get(
+      "/events/search",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const query = typeof req.query.q === "string" ? req.query.q : "";
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        this.logger.info(`GET /events/search?q=${query}`);
+
+        await this.eventController.showSearchPage(res, browserSession, query);
+      }),
+    );
+    
+
+
+    // ── Event lifecycle routes (publish / cancel) ─────────────────────
+
+    // Publish a draft event (staff + admin, but service enforces ownership)
+    this.app.post(
+      "/events/:id/publish",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can publish events.",
+          )
+        ) {
+          return;
+        }
+
+        const eventId = typeof req.params.id === "string" ? req.params.id : "";
+        const store = sessionStore(req);
+        this.logger.info(
+          `POST /events/${eventId}/publish by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.eventController.publishEvent(res, eventId, store);
+      }),
+    );
+
+    // Cancel a published event (staff + admin, but service enforces ownership / admin override)
+    this.app.post(
+      "/events/:id/cancel",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can cancel events.",
+          )
+        ) {
+          return;
+        }
+
+        const eventId = typeof req.params.id === "string" ? req.params.id : "";
+        const store = sessionStore(req);
+        this.logger.info(
+          `POST /events/${eventId}/cancel by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.eventController.cancelEvent(res, eventId, store);
+      }),
+    );
+
+    // Show the organizer dashboard (staff + admin only; members rejected at route level)
+    this.app.get(
+      "/organizer-dashboard",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can access the organizer dashboard.",
+          )
+        ) {
+          return;
+        }
+
+        const store = sessionStore(req);
+        this.logger.info(
+          `GET /organizer-dashboard by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.eventController.showOrganizerDashboard(res, store);
+      }),
+    );
+
     // ── Admin routes ─────────────────────────────────────────────────
 
     this.app.get(
@@ -181,6 +395,22 @@ class ExpressApp implements IApp {
 
         const browserSession = recordPageView(sessionStore(req));
         await this.authController.showAdminUsers(res, browserSession);
+      }),
+    );
+
+    this.app.get(
+      "/my-rsvps",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const store = sessionStore(req);
+        this.logger.info(
+          `GET /my-rsvps for ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.rsvpController.getMyRSVPDashboardFromRequest(res, store);
       }),
     );
 
@@ -253,6 +483,36 @@ class ExpressApp implements IApp {
       }),
     );
 
+    //Features 2 and 6 event routes
+    this.app.get(
+      "/events",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) return;
+
+        const category = 
+          typeof req.query.category === "string" ? req.query.category : undefined;
+        const timeframe =
+          typeof req.query.timeframe === "string" ? req.query.timeframe : undefined;
+
+        await this.eventController.showEventList(
+          res,
+          sessionStore(req),
+          category,
+          timeframe,
+        );
+      }),
+    );
+
+    this.app.get(
+      "/events/:id",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) return;
+
+        const eventId = typeof req.params.id === "string" ? req.params.id : "";
+        await this.eventController.showEventDetail(res, eventId, sessionStore(req));
+      }),
+    );
+
     // ── Error handler ────────────────────────────────────────────────
 
     this.app.use((err: unknown, _req: Request, res: Response, _next: (value?: unknown) => void) => {
@@ -272,7 +532,9 @@ class ExpressApp implements IApp {
 
 export function CreateApp(
   authController: IAuthController,
+  eventController: IEventController,
+  rsvpController: IRSVPController,
   logger: ILoggingService,
 ): IApp {
-  return new ExpressApp(authController, logger);
+  return new ExpressApp(authController, eventController, rsvpController, logger);
 }
