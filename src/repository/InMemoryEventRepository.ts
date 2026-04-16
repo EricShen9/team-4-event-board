@@ -12,8 +12,8 @@ class InMemoryEventRepository implements IEventRepository {
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    this.events.set("1", {
-      id: "1",
+    this.events.set("81", {
+      id: "81",
       organizerId: "admin-user-id",
       title: "HackHer",
       description: "48 hours to plan, build and showcase!",
@@ -27,8 +27,8 @@ class InMemoryEventRepository implements IEventRepository {
       updatedAt: now.toISOString(),
     });
 
-    this.events.set("2", {
-      id: "2",
+    this.events.set("82", {
+      id: "82",
       organizerId: "admin-user-id",
       title: "Open Volleyball",
       description: "Open Gym: volleyball at the rec center",
