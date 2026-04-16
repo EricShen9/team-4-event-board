@@ -245,6 +245,24 @@ class ExpressApp implements IApp {
       }),
     );
 
+    this.app.post(
+  "/events/:id/rsvp",
+  asyncHandler(async (req, res) => {
+    if (!this.requireAuthenticated(req, res)) {
+      return;
+    }
+
+    const eventId = typeof req.params.id === "string" ? req.params.id : "";
+    const store = sessionStore(req);
+
+    await this.rsvpController.toggleRSVPFromRequest(
+      res,
+      eventId,
+      store,
+    );
+  }),
+);
+
     // Handle event modification form submission (staff + admin only)
     this.app.post(
       "/events/:id",
