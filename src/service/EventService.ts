@@ -14,6 +14,8 @@ export interface IEventService {
   getEvent(eventId: string): Promise<Result<IEvent, Error>>;
   publishEvent(eventId: string, userId: string, userRole: UserRole): Promise<Result<IEvent, Error>>;
   cancelEvent(eventId: string, userId: string, userRole: UserRole): Promise<Result<IEvent, Error>>;
+  getEventById(eventId: string, actingUserId: string, actingUserRole: UserRole): Promise<Result<IEvent, Error>>;
+  filterEvents(filters: { category?: string; timeframe?: string }): Promise<Result<IEvent[], Error>>;
 }
 
 class EventService implements IEventService {
@@ -288,6 +290,29 @@ class EventService implements IEventService {
 
     return this.repository.editEvent(eventId, updatedEvent);
   }
+
+  async getEventById(eventId: string, actingUserId: string, actingUserRole: UserRole): Promise<Result<IEvent, Error>> {
+    if (!eventId || eventId.trim() === "") {
+      return Err(new Error("Event ID is required."));
+    }
+    const result = await this.repository.getEvent(eventId);
+    if (!result.ok) {
+      return result;
+    }
+    const event = result.value;
+
+    if (event.status === "draft") {
+      if (event.organizerId !== actingUserId && actingUserRole !== "admin") {
+        return Err(new Error("Event not found."));
+      }
+    }
+
+    return Ok(event);
+  }
+
+  
+  
+  
 }
 
 export function CreateEventService(
