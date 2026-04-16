@@ -54,7 +54,7 @@ class InMemoryEventRepository implements IEventRepository {
     return Ok(event);
   }
 
-    async searchEvents(term: string): Promise<Result<IEvent[], Error>> {
+async searchEvents(term: string): Promise<Result<IEvent[], Error>> {
     try {
       const normalizedTerm = term.trim().toLowerCase();
       const now = new Date();
@@ -93,11 +93,13 @@ class InMemoryEventRepository implements IEventRepository {
       this.logger.error("searchEvents: unable to search events.");
       return Err(new Error("Unable to search events."));
     }
+  }
 
   async getAllEvents(): Promise<Result<IEvent[], Error>> {
     const result = Array.from(this.events.values());
     this.logger.info(`getAllEvents: returning ${result.length} event(s).`);
     return Ok(result);
+  
   }
 }
 

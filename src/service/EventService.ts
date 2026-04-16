@@ -17,6 +17,31 @@ export interface IEventService {
   cancelEvent(eventId: string, userId: string, userRole: UserRole): Promise<Result<IEvent, Error>>;
   getOrganizerEvents(organizerId: string): Promise<Result<IEvent[], Error>>;
   getEventsAdmin(): Promise<Result<IEvent[], Error>>;
+  getEventById(eventId: string, actingUserId: string, actingUserRole: UserRole): Promise<Result<IEvent, Error>>;
+  filterEvents(filters: { category?: string; timeframe?: string }): Promise<Result<IEvent[], Error>>;
+}
+
+// Helper functions for date range calculations
+function getWeekRange(now: Date): { start: Date; end: Date } {
+  const dayOfWeek = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { start: monday, end: sunday };
+}
+
+function getWeekendRange(now: Date): { start: Date; end: Date } {
+  const dayOfWeek = now.getDay();
+  const saturday = new Date(now);
+  saturday.setDate(now.getDate() + (6 - dayOfWeek));
+  saturday.setHours(0, 0, 0, 0);
+  const sunday = new Date(saturday);
+  sunday.setDate(saturday.getDate() + 1);
+  sunday.setHours(23, 59, 59, 999);
+  return { start: saturday, end: sunday };
 }
 
 class EventService implements IEventService {
@@ -304,7 +329,71 @@ class EventService implements IEventService {
     return this.repository.editEvent(eventId, updatedEvent);
   }
 
-   async getOrganizerEvents(organizerId: string): Promise<Result<IEvent[], Error>> {
+  async getEventById(eventId: string, actingUserId: string, actingUserRole: UserRole): Promise<Result<IEvent, Error>> {
+    if (!eventId || eventId.trim() === "") {
+      return Err(new Error("Event ID is required."));
+    }
+    const result = await this.repository.getEvent(eventId);
+    if (!result.ok) {
+      return result;
+    }
+    const event = result.value;
+
+    if (event.status === "draft") {
+      if (event.organizerId !== actingUserId && actingUserRole !== "admin") {
+        return Err(new Error("Event not found."));
+      }
+    }
+
+    return Ok(event);
+  }
+
+  async filterEvents(filters: {
+    category?: string;
+    timeframe?: string;
+  }): Promise<Result<IEvent[], Error>> {
+    const validCategories = ["social", "educational", "volunteer", "sports", "arts"];
+    const validTimeframes = ["upcoming", "this_week", "this_weekend"];
+
+    if (filters.category && !validCategories.includes(filters.category)) {
+      return Err(new Error(`Invalid category: ${filters.category}`));
+    }
+    if (filters.timeframe && !validTimeframes.includes(filters.timeframe)) {
+      return Err(new Error(`Invalid timeframe: ${filters.timeframe}`));
+    }
+
+    const allResult = await this.repository.getAllEvents();
+    if (!allResult.ok) {
+      return allResult;
+    }
+    const allEvents = allResult.value;
+    const now = new Date();
+
+    const filtered = allEvents.filter((event) => {
+      if (event.status !== "published") return false;
+      if (filters.category && event.category !== filters.category) return false;
+
+      const start = new Date(event.startDateTime);
+
+      if (filters.timeframe === "upcoming") {
+        if (start <= now) return false;
+      } else if (filters.timeframe === "this_week") {
+        const week = getWeekRange(now);
+        if (start < week.start || start > week.end) return false;
+      } else if (filters.timeframe === "this_weekend") {
+        const weekend = getWeekendRange(now);
+        if (start < weekend.start || start > weekend.end) return false;
+      } else {
+        if (start <= now) return false;
+      }
+
+      return true;
+    });
+
+    return Ok(filtered);
+  }
+
+  async getOrganizerEvents(organizerId: string): Promise<Result<IEvent[], Error>> {
     if (!organizerId || organizerId.trim() === "") {
       this.logger.warn("getOrganizerEvents: organizerId is required.");
       return Err(new Error("Organizer ID is required."));
