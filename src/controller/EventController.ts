@@ -17,13 +17,24 @@ import type { statusType, IEvent, IRSVP } from "../repository/EventRepository";
  * Controller interface
  */
 export interface IEventController {
+  showSearchPage(res: Response, session: IAppBrowserSession, query: string, pageError?: string | null): Promise<void>;
   showCreateEventForm(res: Response, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
   createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
   showEditEventForm(res: Response, eventId: string, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
   modifyEventFromForm(res: Response, eventId: string, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
   publishEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void>;
   cancelEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void>;
+  showOrganizerDashboard(res: Response, store: AppSessionStore): Promise<void>;
 }
+
+/**
+ * Shape passed to the organizer-dashboard view for each event row.
+ */
+interface DashboardEventRow {
+  event: IEvent;
+  attendeeCount: number;
+}
+
 
 /**
  * Controller implementation
@@ -48,6 +59,52 @@ class EventController implements IEventController {
     if (name === "InvalidStateTransition") return 409;
     if (name === "ConflictError") return 409;
     return 500;
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Derive the attendee count from the registered-user set on an event.
+   */
+  private getAttendeeCount(event: IEvent): number {
+    if (!event.users || event.users.length === 0) return 0;
+    return event.users.reduce((total, set) => total + set.size, 0);
+  }
+
+  /**
+   * Bucket a flat event list into the three dashboard groups.
+   * Published events whose endDateTime has passed land in cancelledOrPast.
+   */
+  private groupEvents(events: IEvent[]): {
+    published: DashboardEventRow[];
+    draft: DashboardEventRow[];
+    cancelledOrPast: DashboardEventRow[];
+  } {
+    const now = new Date();
+    const published: DashboardEventRow[] = [];
+    const draft: DashboardEventRow[] = [];
+    const cancelledOrPast: DashboardEventRow[] = [];
+
+    for (const event of events) {
+      const row: DashboardEventRow = {
+        event,
+        attendeeCount: this.getAttendeeCount(event),
+      };
+
+      const isPast =
+        event.status === "past" ||
+        (event.status === "published" && new Date(event.endDateTime) < now);
+
+      if (event.status === "cancelled" || isPast) {
+        cancelledOrPast.push(row);
+      } else if (event.status === "published") {
+        published.push(row);
+      } else if (event.status === "draft") {
+        draft.push(row);
+      }
+    }
+
+    return { published, draft, cancelledOrPast };
   }
 
   async showCreateEventForm(res: Response, session: IAppBrowserSession, pageError: string | null = null): Promise<void> {
@@ -255,6 +312,34 @@ class EventController implements IEventController {
     this.logger.info(`Event ${eventId} modified by ${currentUser!.userId}`);
     res.redirect("/home");
   }
+    async showSearchPage(
+    res: Response,
+    session: IAppBrowserSession,
+    query: string,
+    pageError: string | null = null,
+  ): Promise<void> {
+    const result = await this.service.searchEvents(query);
+
+    if (result.ok === false) {
+      const err = result.value;
+      const status = this.mapErrorStatus(err);
+      this.logger.warn(`Search events failed: ${err.message}`);
+      res.status(status).render("events/search", {
+        session,
+        pageError: err.message,
+        query,
+        events: [],
+      });
+      return;
+    }
+
+    res.render("events/search", {
+      session,
+      pageError,
+      query,
+      events: result.value,
+    });
+  }
 
   // ── Lifecycle transitions (Feature 5, Sprint 1) ───────────────────
 
@@ -306,6 +391,51 @@ class EventController implements IEventController {
 
     this.logger.info(`Event ${eventId} cancelled by ${currentUser.userId}`);
     res.redirect("/home");
+  }
+
+ async showOrganizerDashboard(res: Response, store: AppSessionStore): Promise<void> {
+    const session = touchAppSession(store);
+    const currentUser = getAuthenticatedUser(store);
+
+    // Defensive — route-level check should already block, but just in case
+    if (!currentUser || (currentUser.role !== "staff" && currentUser.role !== "admin")) {
+      const msg = "Only Staff or Admin can access the organizer dashboard.";
+      this.logger.warn(
+        `Blocked dashboard access by ${currentUser?.role ?? "unauthenticated"}`,
+      );
+      res.status(403).render("partials/error", { message: msg, layout: false });
+      return;
+    }
+
+    // Use the correct service method based on role
+    const eventsResult =
+      currentUser.role === "admin"
+        ? await this.service.getEventsAdmin()
+        : await this.service.getOrganizerEvents(currentUser.userId);
+
+    if (eventsResult.ok === false) {
+      const err = eventsResult.value;
+      const httpStatus = this.mapErrorStatus(err);
+      this.logger.warn(`Organizer dashboard failed: ${err.message}`);
+      res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+      return;
+    }
+
+    const groups = this.groupEvents(eventsResult.value);
+
+    this.logger.info(
+      `Organizer dashboard for ${currentUser.userId}: ` +
+      `${groups.published.length} published, ${groups.draft.length} draft, ` +
+      `${groups.cancelledOrPast.length} cancelled/past`,
+    );
+
+    res.render("events/organizer-dashboard", {
+      session,
+      pageError: null,
+      published: groups.published,
+      draft: groups.draft,
+      cancelledOrPast: groups.cancelledOrPast,
+    });
   }
 }
 

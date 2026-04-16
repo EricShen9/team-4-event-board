@@ -31,5 +31,7 @@ export interface IEventRepository {
   addEvent(event: IEvent): Promise<Result<IEvent, Error>>;
   editEvent(eventId: string, event: IEvent): Promise<Result<IEvent, Error>>;
   getEvent(eventId: string): Promise<Result<IEvent, Error>>;
-  getAllEvents(): Promise<IEvent[]>;
+  getEvent(eventId: string): Promise<Result<IEvent, Error>>;
+  searchEvents(term: string): Promise<Result<IEvent[], Error>>;
+  getAllEvents(): Promise<Result<IEvent[], Error>>;
 }

@@ -268,6 +268,25 @@ class ExpressApp implements IApp {
       }),
     );
 
+      // ── Event search route ───────────────────────────────────────────
+
+    this.app.get(
+      "/events/search",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const query = typeof req.query.q === "string" ? req.query.q : "";
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        this.logger.info(`GET /events/search?q=${query}`);
+
+        await this.eventController.showSearchPage(res, browserSession, query);
+      }),
+    );
+    
+
 
     // ── Event lifecycle routes (publish / cancel) ─────────────────────
 
@@ -318,6 +337,30 @@ class ExpressApp implements IApp {
         );
 
         await this.eventController.cancelEvent(res, eventId, store);
+      }),
+    );
+
+    // Show the organizer dashboard (staff + admin only; members rejected at route level)
+    this.app.get(
+      "/organizer-dashboard",
+      asyncHandler(async (req, res) => {
+        if (
+          !this.requireRole(
+            req,
+            res,
+            ["staff", "admin"],
+            "Only Staff or Admin can access the organizer dashboard.",
+          )
+        ) {
+          return;
+        }
+
+        const store = sessionStore(req);
+        this.logger.info(
+          `GET /organizer-dashboard by ${getAuthenticatedUser(store)?.userId ?? "unknown"}`,
+        );
+
+        await this.eventController.showOrganizerDashboard(res, store);
       }),
     );
 
