@@ -7,7 +7,41 @@ import type { ILoggingService } from "../service/LoggingService";
 class InMemoryEventRepository implements IEventRepository {
   private readonly events: Map<string, IEvent> = new Map();
 
-  constructor(private readonly logger: ILoggingService) {}
+  constructor(private readonly logger: ILoggingService) {
+      const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    this.events.set("1", {
+      id: "1",
+      organizerId: "admin-user-id",
+      title: "HackHer",
+      description: "48 hours to plan, build and showcase!",
+      location: "CLS E110",
+      category: "educational",
+      status: "published",
+      startDateTime: tomorrow.toISOString(),
+      endDateTime: new Date(tomorrow.getTime() + 48 * 60 * 60 * 1000).toISOString(),
+      capacity: 200,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    });
+
+    this.events.set("2", {
+      id: "2",
+      organizerId: "admin-user-id",
+      title: "Open Volleyball",
+      description: "Open Gym: volleyball at the rec center",
+      location: "Rec Center Courts",
+      category: "sports",
+      status: "published",
+      startDateTime: nextWeek.toISOString(),
+      endDateTime: new Date(nextWeek.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+      capacity: 36,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    });
+  }
 
   async addEvent(event: IEvent): Promise<Result<IEvent, Error>> {
     if (this.events.has(event.id)) {

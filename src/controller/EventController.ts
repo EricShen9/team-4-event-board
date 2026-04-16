@@ -25,6 +25,8 @@ export interface IEventController {
   publishEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void>;
   cancelEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void>;
   showOrganizerDashboard(res: Response, store: AppSessionStore): Promise<void>;
+  showEventDetail(res: Response, eventId: string, store: AppSessionStore, pageError?: string | null): Promise<void>;
+  showEventList(res: Response, store: AppSessionStore, category?: string, timeframe?: string, pageError?: string | null): Promise<void>;
 }
 
 /**
@@ -435,6 +437,80 @@ class EventController implements IEventController {
       published: groups.published,
       draft: groups.draft,
       cancelledOrPast: groups.cancelledOrPast,
+    });
+  }
+
+  // Feature 2: Event Detail Page
+  async showEventDetail(
+    res: Response,
+    eventId: string,
+    store: AppSessionStore,
+    pageError: string | null = null,
+  ): Promise<void> {
+    const session = touchAppSession(store);
+    const currentUser = getAuthenticatedUser(store);
+
+    if (!currentUser) {
+      res.status(401).render("partials/error", {
+        message: "Please log in to view this event.",
+        layout: false,
+      });
+      return;
+    }
+
+    const result = await this.service.getEventById(
+      eventId,
+      currentUser.userId,
+      currentUser.role,
+    );
+
+    if (result.ok === false) {
+      const err = result.value;
+      this.logger.warn(`showEventDetail: ${err.message}`);
+      res.status(404).render("partials/error", {
+        message: "Event not found.",
+        layout: false,
+      });
+      return;
+    }
+
+    res.render("events/detail", {
+      session,
+      pageError,
+      event: result.value,
+    });
+  }
+
+  // Feature 6: Category and Date Filter
+
+  async showEventList(
+    res: Response,
+    store: AppSessionStore,
+    category?: string,
+    timeframe?: string,
+    pageError: string | null = null,
+  ): Promise<void> {
+    const session = touchAppSession(store);
+
+    const result = await this.service.filterEvents({ category, timeframe });
+
+    if (result.ok === false) {
+      const err = result.value;
+      this.logger.warn(`showEventList: ${err.message}`);
+      res.render("events/list", {
+        session,
+        pageError: err.message,
+        events: [],
+        filters: { category: category ?? "", timeframe: timeframe ?? "" },
+      });
+      return;
+    }
+
+    res.render("events/list", {
+      session,
+      pageError,
+      events: result.value,
+      filters: { category: category ?? "", timeframe: timeframe ?? "" },
     });
   }
 }
