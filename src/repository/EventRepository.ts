@@ -1,7 +1,7 @@
 import { Result } from "../lib/result";
 
 export type statusType = "published" | "draft" | "cancelled" | "past";
-
+export type RSVPStatusType = "going" | "waitlisted" | "cancelled";
 export interface IEvent {
   id: string;
   organizerId: string;
@@ -22,7 +22,7 @@ export interface IRSVP {
   id: string;
   eventId: string;
   userId: string;
-  status: statusType;
+  status: RSVPStatusType;
   createdAt: string;
 }
 
