@@ -268,6 +268,25 @@ class ExpressApp implements IApp {
       }),
     );
 
+      // ── Event search route ───────────────────────────────────────────
+
+    this.app.get(
+      "/events/search",
+      asyncHandler(async (req, res) => {
+        if (!this.requireAuthenticated(req, res)) {
+          return;
+        }
+
+        const query = typeof req.query.q === "string" ? req.query.q : "";
+        const store = sessionStore(req);
+        const browserSession = recordPageView(store);
+        this.logger.info(`GET /events/search?q=${query}`);
+
+        await this.eventController.showSearchPage(res, browserSession, query);
+      }),
+    );
+    
+
 
     // ── Event lifecycle routes (publish / cancel) ─────────────────────
 

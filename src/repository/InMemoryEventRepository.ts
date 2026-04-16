@@ -53,6 +53,46 @@ class InMemoryEventRepository implements IEventRepository {
     this.logger.info(`getEvent: retrieved event ${eventId}.`);
     return Ok(event);
   }
+    async searchEvents(term: string): Promise<Result<IEvent[], Error>> {
+    try {
+      const normalizedTerm = term.trim().toLowerCase();
+      const now = new Date();
+
+      const matches = Array.from(this.events.values())
+        .filter((event) => {
+          if (event.status !== "published") {
+            return false;
+          }
+
+          const start = new Date(event.startDateTime);
+          if (Number.isNaN(start.getTime()) || start <= now) {
+            return false;
+          }
+
+          if (!normalizedTerm) {
+            return true;
+          }
+
+          return (
+            event.title.toLowerCase().includes(normalizedTerm) ||
+            event.description.toLowerCase().includes(normalizedTerm) ||
+            event.location.toLowerCase().includes(normalizedTerm)
+          );
+        })
+        .sort(
+          (a, b) =>
+            new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime(),
+        );
+
+      this.logger.info(
+        `searchEvents: found ${matches.length} matching published upcoming event(s).`,
+      );
+      return Ok(matches);
+    } catch {
+      this.logger.error("searchEvents: unable to search events.");
+      return Err(new Error("Unable to search events."));
+    }
+  }
 }
 
 export function CreateInMemoryEventRepository(
