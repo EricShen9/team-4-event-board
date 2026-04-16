@@ -53,6 +53,10 @@ class InMemoryEventRepository implements IEventRepository {
     this.logger.info(`getEvent: retrieved event ${eventId}.`);
     return Ok(event);
   }
+
+  async getAllEvents(): Promise<IEvent[]> {
+    return Array.from(this.events.values());
+  }
 }
 
 export function CreateInMemoryEventRepository(
