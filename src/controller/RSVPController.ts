@@ -13,6 +13,11 @@ export interface IRSVPController {
     res: Response,
     store: AppSessionStore,
   ): Promise<void>;
+  toggleRSVPFromRequest(
+  res: Response,
+  eventId: string,
+  store: AppSessionStore,
+): Promise<void>;
 }
 
 class RSVPController implements IRSVPController {
@@ -20,6 +25,39 @@ class RSVPController implements IRSVPController {
     private readonly rsvpService: IRSVPService,
     private readonly logger: ILoggingService,
   ) {}
+  
+  async toggleRSVPFromRequest(
+  res: Response,
+  eventId: string,
+  store: AppSessionStore,
+): Promise<void> {
+  const currentUser = getAuthenticatedUser(store);
+
+  if (!currentUser) {
+    res.status(401).render("partials/error", {
+      message: "Unauthorized",
+      layout: false,
+    });
+    return;
+  }
+
+  const result = await this.rsvpService.toggleRSVP(
+    eventId,
+    currentUser.userId,
+    currentUser.role,
+  );
+
+  if (result.ok === false) {
+  this.logger.warn(`RSVP toggle failed: ${result.value.message}`);
+  res.status(400).render("partials/error", {
+    message: result.value.message,
+    layout: false,
+  });
+  return;
+}
+
+  res.redirect("/home");
+}
 
   async getMyRSVPDashboardFromRequest(
     res: Response,
