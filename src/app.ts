@@ -453,7 +453,7 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         if (!this.requireAuthenticated(req, res)) return;
 
-        const category =
+        const category = 
           typeof req.query.category === "string" ? req.query.category : undefined;
         const timeframe =
           typeof req.query.timeframe === "string" ? req.query.timeframe : undefined;
