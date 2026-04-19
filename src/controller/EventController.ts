@@ -169,7 +169,6 @@ class EventController implements IEventController {
     // Convert to ISO strings (format conversion, not business logic)
     const startDate = new Date(startDateTimeRaw);
     const endDate = new Date(endDateTimeRaw);
-    const createdAt = new Date();
     
     let capacity: number | undefined;
     if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
@@ -188,7 +187,7 @@ class EventController implements IEventController {
       startDateTime: startDate.toISOString(),
       endDateTime: endDate.toISOString(),
       capacity,
-      createdAt: createdAt.toISOString(),
+      createdAt: new Date().toISOString(),
     };
 
     const result = await this.service.createEvent(eventForm);
