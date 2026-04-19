@@ -88,7 +88,6 @@ class InMemoryEventRepository implements IEventRepository {
       ...existingEvent,
       ...patch,
       id: eventId,
-      updatedAt: patch.updatedAt || new Date().toISOString(),
     };
 
     this.events.set(eventId, updatedEvent);

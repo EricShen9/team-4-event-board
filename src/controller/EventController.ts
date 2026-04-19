@@ -316,6 +316,7 @@ class EventController implements IEventController {
       endDateTime: endDate.toISOString(),
       capacity,
       status: status as statusType,
+      updatedAt: new Date().toISOString(),
     };
 
     const result = await this.service.modifyEvent(eventId, patch);

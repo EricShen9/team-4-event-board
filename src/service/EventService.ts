@@ -59,7 +59,7 @@ class EventService implements IEventService {
       this.logger.warn("Create event: start is not before end.");
       return Err(EventValidationError("Event start must be before end time."));
     }
-    if (eventForm.startDateTime! < new Date().toISOString()) {
+    if (eventForm.startDateTime! < eventForm.createdAt!) {
       this.logger.warn("Create event: start is before current time.");
       return Err(EventValidationError("Event start cannot be before current time."));
     }
@@ -105,7 +105,7 @@ class EventService implements IEventService {
       this.logger.warn("Create event: start is not before end.");
       return Err(EventValidationError("Event start must be before end time."));
     }
-    if (patch.startDateTime! < new Date().toISOString()) {
+    if (patch.startDateTime! < patch.updatedAt!) {
       this.logger.warn("Create event: start is before current time.");
       return Err(EventValidationError("Event start cannot be before current time."));
     }
