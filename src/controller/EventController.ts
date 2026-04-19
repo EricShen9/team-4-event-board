@@ -8,11 +8,11 @@ import {
   type AppSessionStore,
 } from "../session/AppSession";
 import type { ILoggingService } from "../service/LoggingService";
-import type { Result } from "../lib/result";
 import type { IEventService } from "../service/EventService";
 import type { statusType, IEvent, IRSVP } from "../repository/EventRepository";
-import type { EventError } from "../lib/error";
-import type { AuthError } from "../auth/errors"
+import { 
+  EventValidationError, 
+} from "../lib/error"
 /**
  * Controller interface
  */
@@ -128,42 +128,48 @@ class EventController implements IEventController {
     const startDateTimeRaw = typeof input.startDateTime === "string" ? input.startDateTime.trim() : "";
     const endDateTimeRaw = typeof input.endDateTime === "string" ? input.endDateTime.trim() : "";
 
-    if (!title) {
-      this.logger.warn("Create event failed: Title is required.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "Title is required.");
-      return;
-    }
-    if (!description) {
-      this.logger.warn("Create event failed: Description is required.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "Description is required.");
-      return;
-    }
-    if (!location) {
-      this.logger.warn("Create event failed: Location is required.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "Location is required.");
-      return;
-    }
-    if (!category) {
-      this.logger.warn("Create event failed: Category is required.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "Category is required.");
-      return;
-    }
-    if (!startDateTimeRaw) {
-      this.logger.warn("Create event failed: Start date/time is required.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "Start date/time is required.");
-      return;
-    }
-    if (!endDateTimeRaw) {
-      this.logger.warn("Create event failed: End date/time is required.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "End date/time is required.");
-      return;
-    }
+if (!title) {
+    const err = EventValidationError("Title is required.");
+    this.logger.warn(`Create event failed: ${err.message}`);
+    res.status(400);
+    await this.showCreateEventForm(res, session, err.message);
+    return;
+  }
+  if (!description) {
+    const err = EventValidationError("Description is required.");
+    this.logger.warn(`Create event failed: ${err.message}`);
+    res.status(400);
+    await this.showCreateEventForm(res, session, err.message);
+    return;
+  }
+  if (!location) {
+    const err = EventValidationError("Location is required.");
+    this.logger.warn(`Create event failed: ${err.message}`);
+    res.status(400);
+    await this.showCreateEventForm(res, session, err.message);
+    return;
+  }
+  if (!category) {
+    const err = EventValidationError("Category is required.");
+    this.logger.warn(`Create event failed: ${err.message}`);
+    res.status(400);
+    await this.showCreateEventForm(res, session, err.message);
+    return;
+  }
+  if (!startDateTimeRaw) {
+    const err = EventValidationError("Start date/time is required.");
+    this.logger.warn(`Create event failed: ${err.message}`);
+    res.status(400);
+    await this.showCreateEventForm(res, session, err.message);
+    return;
+  }
+  if (!endDateTimeRaw) {
+    const err = EventValidationError("End date/time is required.");
+    this.logger.warn(`Create event failed: ${err.message}`);
+    res.status(400);
+    await this.showCreateEventForm(res, session, err.message);
+    return;
+  }
     
     // Parse dates for service 
     const startDate = new Date(startDateTimeRaw);
