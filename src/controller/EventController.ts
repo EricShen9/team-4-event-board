@@ -11,8 +11,8 @@ import type { ILoggingService } from "../service/LoggingService";
 import type { Result } from "../lib/result";
 import type { IEventService } from "../service/EventService";
 import type { statusType, IEvent, IRSVP } from "../repository/EventRepository";
-
-
+import type { EventError } from "../lib/error";
+import type { AuthError } from "../auth/errors"
 /**
  * Controller interface
  */
@@ -53,16 +53,19 @@ class EventController implements IEventController {
   constructor(private readonly service: IEventService, private readonly logger: ILoggingService) {}
 
   private mapErrorStatus(error: Error): number {
-    // Map some common error names to HTTP statuses; adapt to your service errors if different.
-    const name = (error as any).name;
-    if (name === "AuthorizationRequired") return 403;
-    if (name === "EventNotFound") return 404;
-    if (name === "ValidationError" || name === "InvalidInput") return 400;
-    if (name === "InvalidStateTransition") return 409;
-    if (name === "ConflictError") return 409;
+    // Auth errors (mirrors AuthController pattern)
+    if (error.name === "AuthenticationRequired") return 401;
+    if (error.name === "AuthorizationRequired") return 403;
+    
+    // Event errors
+    if (error.name === "EventAuthorizationError") return 403;
+    if (error.name === "EventNotFound") return 404;
+    if (error.name === "EventValidationError") return 400;
+    if (error.name === "EventStateError") return 409;
+    
     return 500;
   }
-
+  
   // ── Helpers ────────────────────────────────────────────────────────
 
   /**
@@ -116,6 +119,7 @@ class EventController implements IEventController {
   async createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void> {
     const session = touchAppSession(store);
     const currentUser = getAuthenticatedUser(store);
+    
     // Controller responsibility: Check for mandatory fields (non-empty)
     const title = typeof input.title === "string" ? input.title.trim() : "";
     const description = typeof input.description === "string" ? input.description.trim() : "";
@@ -160,10 +164,12 @@ class EventController implements IEventController {
       await this.showCreateEventForm(res, session, "End date/time is required.");
       return;
     }
+    
     // Parse dates for service 
     const startDate = new Date(startDateTimeRaw);
     const endDate = new Date(endDateTimeRaw);
     const createdAt = new Date();
+    
     // Handle capacity conversion (empty = undefined)
     let capacity: number | undefined;
     if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
