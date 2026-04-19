@@ -60,6 +60,7 @@ class EventController implements IEventController {
     // Event errors
     if (error.name === "EventAuthorizationError") return 403;
     if (error.name === "EventNotFound") return 404;
+    if (error.name === "EventAlreadyExists") return 409;
     if (error.name === "EventValidationError") return 400;
     if (error.name === "EventStateError") return 409;
     
@@ -186,7 +187,7 @@ if (!title) {
 
     const eventForm: Partial<IEvent> = {
       organizerId: currentUser!.userId,
-      title,
+      title, 
       description,
       location,
       category,
@@ -195,7 +196,6 @@ if (!title) {
       endDateTime: endDate.toISOString(),
       capacity,
       createdAt: createdAt.toISOString(),
-      updatedAt: createdAt.toISOString(),
     };
 
     const result = await this.service.createEvent(eventForm);
