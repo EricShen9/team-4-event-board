@@ -114,14 +114,15 @@ class EventController implements IEventController {
   }
 
   async showCreateEventForm(res: Response, session: IAppBrowserSession, pageError: string | null = null): Promise<void> {
-    res.render("events/create", { session, pageError, event: null });
+    // Always render the form partial (no layout)
+    res.render("events/create-form", { session, pageError, event: null });
   }
 
   async createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void> {
     const session = touchAppSession(store);
     const currentUser = getAuthenticatedUser(store);
     
-    // Controller responsibility: Check for mandatory fields (non-empty)
+    // Form validation only (required fields, basic format)
     const title = typeof input.title === "string" ? input.title.trim() : "";
     const description = typeof input.description === "string" ? input.description.trim() : "";
     const location = typeof input.location === "string" ? input.location.trim() : "";
@@ -129,55 +130,48 @@ class EventController implements IEventController {
     const startDateTimeRaw = typeof input.startDateTime === "string" ? input.startDateTime.trim() : "";
     const endDateTimeRaw = typeof input.endDateTime === "string" ? input.endDateTime.trim() : "";
 
-if (!title) {
-    const err = EventValidationError("Title is required.");
-    this.logger.warn(`Create event failed: ${err.message}`);
-    res.status(400);
-    await this.showCreateEventForm(res, session, err.message);
-    return;
-  }
-  if (!description) {
-    const err = EventValidationError("Description is required.");
-    this.logger.warn(`Create event failed: ${err.message}`);
-    res.status(400);
-    await this.showCreateEventForm(res, session, err.message);
-    return;
-  }
-  if (!location) {
-    const err = EventValidationError("Location is required.");
-    this.logger.warn(`Create event failed: ${err.message}`);
-    res.status(400);
-    await this.showCreateEventForm(res, session, err.message);
-    return;
-  }
-  if (!category) {
-    const err = EventValidationError("Category is required.");
-    this.logger.warn(`Create event failed: ${err.message}`);
-    res.status(400);
-    await this.showCreateEventForm(res, session, err.message);
-    return;
-  }
-  if (!startDateTimeRaw) {
-    const err = EventValidationError("Start date/time is required.");
-    this.logger.warn(`Create event failed: ${err.message}`);
-    res.status(400);
-    await this.showCreateEventForm(res, session, err.message);
-    return;
-  }
-  if (!endDateTimeRaw) {
-    const err = EventValidationError("End date/time is required.");
-    this.logger.warn(`Create event failed: ${err.message}`);
-    res.status(400);
-    await this.showCreateEventForm(res, session, err.message);
-    return;
-  }
+    if (!title) {
+      const err = EventValidationError("Title is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
+      res.status(400);
+      return res.render("partials/error", { message: err.message });
+    }
+    if (!description) {
+      const err = EventValidationError("Description is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
+      res.status(400);
+      return res.render("partials/error", { message: err.message });
+    }
+    if (!location) {
+      const err = EventValidationError("Location is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
+      res.status(400);
+      return res.render("partials/error", { message: err.message });
+    }
+    if (!category) {
+      const err = EventValidationError("Category is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
+      res.status(400);
+      return res.render("partials/error", { message: err.message });
+    }
+    if (!startDateTimeRaw) {
+      const err = EventValidationError("Start date/time is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
+      res.status(400);
+      return res.render("partials/error", { message: err.message });
+    }
+    if (!endDateTimeRaw) {
+      const err = EventValidationError("End date/time is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
+      res.status(400);  
+      return res.render("partials/error", { message: err.message });
+    }
     
-    // Parse dates for service 
+    // Convert to ISO strings (format conversion, not business logic)
     const startDate = new Date(startDateTimeRaw);
     const endDate = new Date(endDateTimeRaw);
     const createdAt = new Date();
     
-    // Handle capacity conversion (empty = undefined)
     let capacity: number | undefined;
     if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
       capacity = typeof input.capacity === "number" 
@@ -187,7 +181,7 @@ if (!title) {
 
     const eventForm: Partial<IEvent> = {
       organizerId: currentUser!.userId,
-      title, 
+      title,
       description,
       location,
       category,
@@ -199,19 +193,20 @@ if (!title) {
     };
 
     const result = await this.service.createEvent(eventForm);
-
     if (result.ok === false) {
       const err = result.value;
       const status = this.mapErrorStatus(err);
       const log = status >= 500 ? this.logger.error : this.logger.warn;
       log.call(this.logger, `Create event failed: ${err.message}`);
       res.status(status);
-      await this.showCreateEventForm(res, session, err.message);
-      return;
+      return res.render("partials/error", { message: err.message });
     }
 
     this.logger.info(`Event created ${result.value.id} by ${currentUser!.userId}`);
-    res.redirect("/home");
+    return res.render("partials/success", { 
+      message: "Event created successfully! Redirecting...",
+      redirectUrl: "/home"
+    });
   }
 
   async showEditEventForm(res: Response, eventId: string, session: IAppBrowserSession, pageError: string | null = null): Promise<void> {
