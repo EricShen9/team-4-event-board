@@ -3,7 +3,7 @@
 import { Result, Ok, Err } from "../lib/result";
 import type { IEvent, IEventRepository } from "./EventRepository";
 import type { ILoggingService } from "../service/LoggingService";
-import { EventAlreadyExists, EventNotFound } from "../lib/error";
+import { EventAlreadyExists, EventNotFound, EventIdMismatch } from "../lib/error";
 
 class InMemoryEventRepository implements IEventRepository {
   private readonly events: Map<string, IEvent> = new Map();
@@ -67,22 +67,33 @@ class InMemoryEventRepository implements IEventRepository {
 
   async editEvent(
     eventId: string,
-    event: IEvent,
+    patch: Partial<IEvent>,
   ): Promise<Result<IEvent, Error>> {
+    // Check if event exists
     if (!this.events.has(eventId)) {
-      this.logger.warn(`editEvent: event with id ${eventId} not found.`);
-      return Err(new Error(`Event with id ${eventId} not found.`));
+      this.logger.warn(`modifyEvent: event with id ${eventId} not found.`);
+      return Err(EventNotFound(`Event with id ${eventId} not found.`));
     }
 
-    // Ensure the event being saved has the correct ID
-    if (event.id !== eventId) {
-      this.logger.warn(`editEvent: event id mismatch (${event.id} vs ${eventId}).`);
-      return Err(new Error("Event ID mismatch."));
+    const existingEvent = this.events.get(eventId)!;
+    
+    // Check for event ID mismatch
+    if (patch.id && patch.id !== eventId) {
+      this.logger.warn(`modifyEvent: event id mismatch (${patch.id} vs ${eventId}).`);
+      return Err(EventIdMismatch("Event ID mismatch."));
     }
 
-    this.events.set(eventId, event);
-    this.logger.info(`editEvent: updated event ${eventId} ("${event.title}").`);
-    return Ok(event);
+    // Simple merge and save - NO business logic
+    const updatedEvent: IEvent = {
+      ...existingEvent,
+      ...patch,
+      id: eventId,
+      updatedAt: patch.updatedAt || new Date().toISOString(),
+    };
+
+    this.events.set(eventId, updatedEvent);
+    this.logger.info(`modifyEvent: updated event ${eventId} ("${updatedEvent.title}").`);
+    return Ok(updatedEvent);
   }
 
   async getEvent(eventId: string): Promise<Result<IEvent, Error>> {
@@ -90,7 +101,7 @@ class InMemoryEventRepository implements IEventRepository {
     
     if (!event) {
       this.logger.warn(`getEvent: event with id ${eventId} not found.`);
-      return Err(new Error(`Event with id ${eventId} not found.`));
+      return Err(EventNotFound(`Event with id ${eventId} not found.`));
     }
 
     this.logger.info(`getEvent: retrieved event ${eventId}.`);
