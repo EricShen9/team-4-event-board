@@ -4,7 +4,7 @@ import { Result, Ok, Err } from "../lib/result";
 import type { ILoggingService } from "./LoggingService";
 import type { statusType, IEvent, IRSVP, IEventRepository } from "../repository/EventRepository";
 import type { UserRole } from "../auth/User";
-
+import { EventValidationError } from "../lib/error";
 /**
  * Service interface — imported by EventController.
  */
@@ -55,23 +55,14 @@ class EventService implements IEventService {
   }
 
   async createEvent(eventForm: Partial<IEvent>): Promise<Result<IEvent, Error>> {
-    const now = new Date();
-    const start = new Date(eventForm.startDateTime!);
-    const end = new Date(eventForm.endDateTime!);
-
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      this.logger.warn("Create event: invalid date/time format.");
-      return Err(new Error("Invalid date/time format."));
-    }
-    if (start >= end) {
+    if (eventForm.startDateTime! >= eventForm.endDateTime!) {
       this.logger.warn("Create event: start is not before end.");
-      return Err(new Error("Event start must be before end time."));
+      return Err(EventValidationError("Event start must be before end time."));
     }
-    if (start < now) {
+    if (eventForm.startDateTime! < new Date().toISOString()) {
       this.logger.warn("Create event: start is before current time.");
-      return Err(new Error("Event start cannot be before current time."));
+      return Err(EventValidationError("Event start cannot be before current time."));
     }
-
     if (eventForm.capacity !== undefined) {
       if (
         typeof eventForm.capacity !== "number" ||
@@ -79,26 +70,11 @@ class EventService implements IEventService {
         eventForm.capacity <= 0
       ) {
         this.logger.warn("Create event: invalid capacity.");
-        return Err(new Error("Capacity must be a positive non-zero number."));
+        return Err(EventValidationError("Capacity must be a positive non-zero number."));
       }
     }
 
-    const nowISO = now.toISOString();
-    const event: IEvent = {
-      id: this.generateId(),
-      organizerId: eventForm.organizerId ?? "",
-      title: eventForm.title!.trim(),
-      description: eventForm.description?.trim() ?? "",
-      location: eventForm.location?.trim() ?? "",
-      category: eventForm.category?.trim() ?? "",
-      status: "draft",
-      startDateTime: start.toISOString(),
-      endDateTime: end.toISOString(),
-      capacity: eventForm.capacity,
-      createdAt: eventForm.createdAt ?? nowISO,
-      updatedAt: eventForm.updatedAt ?? nowISO,
-    };
-    return this.repository.addEvent(event);
+    return this.repository.addEvent(eventForm as IEvent);
   }
 
   async modifyEvent(

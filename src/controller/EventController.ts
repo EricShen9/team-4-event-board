@@ -8,11 +8,11 @@ import {
   type AppSessionStore,
 } from "../session/AppSession";
 import type { ILoggingService } from "../service/LoggingService";
-import type { Result } from "../lib/result";
 import type { IEventService } from "../service/EventService";
 import type { statusType, IEvent, IRSVP } from "../repository/EventRepository";
-
-
+import { 
+  EventValidationError, 
+} from "../lib/error"
 /**
  * Controller interface
  */
@@ -53,16 +53,20 @@ class EventController implements IEventController {
   constructor(private readonly service: IEventService, private readonly logger: ILoggingService) {}
 
   private mapErrorStatus(error: Error): number {
-    // Map some common error names to HTTP statuses; adapt to your service errors if different.
-    const name = (error as any).name;
-    if (name === "AuthorizationRequired") return 403;
-    if (name === "EventNotFound") return 404;
-    if (name === "ValidationError" || name === "InvalidInput") return 400;
-    if (name === "InvalidStateTransition") return 409;
-    if (name === "ConflictError") return 409;
+    // Auth errors (mirrors AuthController pattern)
+    if (error.name === "AuthenticationRequired") return 401;
+    if (error.name === "AuthorizationRequired") return 403;
+    
+    // Event errors
+    if (error.name === "EventAuthorizationError") return 403;
+    if (error.name === "EventNotFound") return 404;
+    if (error.name === "EventAlreadyExists") return 409;
+    if (error.name === "EventValidationError") return 400;
+    if (error.name === "EventStateError") return 409;
+    
     return 500;
   }
-
+  
   // ── Helpers ────────────────────────────────────────────────────────
 
   /**
@@ -110,13 +114,14 @@ class EventController implements IEventController {
   }
 
   async showCreateEventForm(res: Response, session: IAppBrowserSession, pageError: string | null = null): Promise<void> {
+    // Always render the form partial (no layout)
     res.render("events/create", { session, pageError, event: null });
   }
 
   async createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void> {
-    const session = touchAppSession(store);
     const currentUser = getAuthenticatedUser(store);
-    // Controller responsibility: Check for mandatory fields (non-empty)
+    
+    // Form validation only (required fields, basic format)
     const title = typeof input.title === "string" ? input.title.trim() : "";
     const description = typeof input.description === "string" ? input.description.trim() : "";
     const location = typeof input.location === "string" ? input.location.trim() : "";
@@ -125,46 +130,47 @@ class EventController implements IEventController {
     const endDateTimeRaw = typeof input.endDateTime === "string" ? input.endDateTime.trim() : "";
 
     if (!title) {
-      this.logger.warn("Create event failed: Title is required.");
+      const err = EventValidationError("Title is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
       res.status(400);
-      await this.showCreateEventForm(res, session, "Title is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!description) {
-      this.logger.warn("Create event failed: Description is required.");
+      const err = EventValidationError("Description is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
       res.status(400);
-      await this.showCreateEventForm(res, session, "Description is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!location) {
-      this.logger.warn("Create event failed: Location is required.");
+      const err = EventValidationError("Location is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
       res.status(400);
-      await this.showCreateEventForm(res, session, "Location is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!category) {
-      this.logger.warn("Create event failed: Category is required.");
+      const err = EventValidationError("Category is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
       res.status(400);
-      await this.showCreateEventForm(res, session, "Category is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!startDateTimeRaw) {
-      this.logger.warn("Create event failed: Start date/time is required.");
+      const err = EventValidationError("Start date/time is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
       res.status(400);
-      await this.showCreateEventForm(res, session, "Start date/time is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!endDateTimeRaw) {
-      this.logger.warn("Create event failed: End date/time is required.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "End date/time is required.");
-      return;
+      const err = EventValidationError("End date/time is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
+      res.status(400);  
+      return res.render("partials/error", { message: err.message, layout: false });
     }
-    // Parse dates for service 
+    
+    // Convert to ISO strings (format conversion, not business logic)
     const startDate = new Date(startDateTimeRaw);
     const endDate = new Date(endDateTimeRaw);
     const createdAt = new Date();
-    // Handle capacity conversion (empty = undefined)
+    
     let capacity: number | undefined;
     if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
       capacity = typeof input.capacity === "number" 
@@ -183,23 +189,24 @@ class EventController implements IEventController {
       endDateTime: endDate.toISOString(),
       capacity,
       createdAt: createdAt.toISOString(),
-      updatedAt: createdAt.toISOString(),
     };
 
     const result = await this.service.createEvent(eventForm);
-
     if (result.ok === false) {
       const err = result.value;
       const status = this.mapErrorStatus(err);
       const log = status >= 500 ? this.logger.error : this.logger.warn;
       log.call(this.logger, `Create event failed: ${err.message}`);
       res.status(status);
-      await this.showCreateEventForm(res, session, err.message);
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
 
     this.logger.info(`Event created ${result.value.id} by ${currentUser!.userId}`);
-    res.redirect("/home");
+    return res.render("partials/success", { 
+      message: "Event created successfully! Redirecting...",
+      redirectUrl: "/home",
+      layout: false,
+    });
   }
 
   async showEditEventForm(res: Response, eventId: string, session: IAppBrowserSession, pageError: string | null = null): Promise<void> {

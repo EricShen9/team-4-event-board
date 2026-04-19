@@ -3,12 +3,14 @@
 import { Result, Ok, Err } from "../lib/result";
 import type { IEvent, IEventRepository } from "./EventRepository";
 import type { ILoggingService } from "../service/LoggingService";
+import { EventAlreadyExists, EventNotFound } from "../lib/error";
 
 class InMemoryEventRepository implements IEventRepository {
   private readonly events: Map<string, IEvent> = new Map();
+  private nextID: number = 1;
 
   constructor(private readonly logger: ILoggingService) {
-      const now = new Date();
+    const now = new Date();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
@@ -43,18 +45,25 @@ class InMemoryEventRepository implements IEventRepository {
     });
   }
 
-  async addEvent(event: IEvent): Promise<Result<IEvent, Error>> {
-    if (this.events.has(event.id)) {
-      this.logger.warn(`addEvent: event with id ${event.id} already exists.`);
-      return Err(new Error(`Event with id ${event.id} already exists.`));
-    }
-
-    this.events.set(event.id, event);
-    this.logger.info(`addEvent: stored event ${event.id} ("${event.title}").`);
-    return Ok(event);
+  private generateId(): string {
+    return `${this.nextID++}`;
   }
 
-  // ── Stubs — to be implemented later ────────────────────────────────
+  async addEvent(event: IEvent): Promise<Result<IEvent, Error>> {
+    const eventWithId = {
+      ...event,
+      id: event.id || this.generateId(),
+    };
+
+    if (this.events.has(eventWithId.id)) {
+      this.logger.warn(`addEvent: event with id ${eventWithId.id} already exists.`);
+      return Err(EventAlreadyExists(`Event with id ${eventWithId.id} already exists.`));
+    }
+
+    this.events.set(eventWithId.id, eventWithId);
+    this.logger.info(`addEvent: stored event ${eventWithId.id} ("${eventWithId.title}").`);
+    return Ok(eventWithId);
+  }
 
   async editEvent(
     eventId: string,
