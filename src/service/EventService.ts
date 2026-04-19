@@ -81,98 +81,47 @@ class EventService implements IEventService {
     eventId: string,
     patch: Partial<IEvent>,
   ): Promise<Result<IEvent, Error>> {
-    // Fetch existing event
+    // Fetch existing event first to check business rules
     const existingResult = await this.repository.getEvent(eventId);
     if (!existingResult.ok) {
-      this.logger.warn(`modifyEvent: event ${eventId} not found.`);
       return existingResult;
     }
-
-    const existing = existingResult.value;
+    
+    const existingEvent = existingResult.value;
     const now = new Date();
-
-    // Service responsibility: Validate state-based rules first
-    if (existing.status === "cancelled") {
-      this.logger.warn("modifyEvent: cannot modify cancelled event.");
-      return Err(new Error("Cannot modify a cancelled event."));
+    
+    // Business logic: State-based rules
+    if (existingEvent.status === "cancelled") {
+      this.logger.warn(`modifyEvent: cannot modify cancelled event ${eventId}.`);
+      return Err(EventValidationError("Cannot modify a cancelled event."));
+    }
+    if (new Date(existingEvent.startDateTime) < now) {
+      this.logger.warn(`modifyEvent: cannot modify past event ${eventId}.`);
+      return Err(EventValidationError("Cannot modify a past event."));
     }
     
-    if (new Date(existing.startDateTime) < now) {
-      this.logger.warn("modifyEvent: cannot modify past event.");
-      return Err(new Error("Cannot modify a past event."));
+    // Business logic: Chronology validation
+    if (patch.startDateTime! >= patch.endDateTime!) {
+      this.logger.warn("Create event: start is not before end.");
+      return Err(EventValidationError("Event start must be before end time."));
+    }
+    if (patch.startDateTime! < new Date().toISOString()) {
+      this.logger.warn("Create event: start is before current time.");
+      return Err(EventValidationError("Event start cannot be before current time."));
     }
 
-    // Service responsibility: Date format validation (if provided)
-    if (patch.startDateTime) {
-      const newStart = new Date(patch.startDateTime);
-      if (Number.isNaN(newStart.getTime())) {
-        this.logger.warn("modifyEvent: invalid start date/time format.");
-        return Err(new Error("Invalid start date/time format."));
-      }
-    }
-
-    if (patch.endDateTime) {
-      const newEnd = new Date(patch.endDateTime);
-      if (Number.isNaN(newEnd.getTime())) {
-        this.logger.warn("modifyEvent: invalid end date/time format.");
-        return Err(new Error("Invalid end date/time format."));
-      }
-    }
-
-    // Service responsibility: Chronology validation
-    const effectiveStart = patch.startDateTime
-      ? new Date(patch.startDateTime)
-      : new Date(existing.startDateTime);
-    const effectiveEnd = patch.endDateTime
-      ? new Date(patch.endDateTime)
-      : new Date(existing.endDateTime);
-
-    if (effectiveStart >= effectiveEnd) {
-      this.logger.warn("modifyEvent: start must be before end.");
-      return Err(new Error("Event start must be before end time."));
-    }
-
-    // Service responsibility: Past date validation (if changed)
-    if (patch.startDateTime && effectiveStart < now) {
-      this.logger.warn("modifyEvent: start date cannot be in the past.");
-      return Err(new Error("Start date/time cannot be in the past."));
-    }
-
-    // Service responsibility: Capacity validation (if provided)
     if (patch.capacity !== undefined) {
       if (
         typeof patch.capacity !== "number" ||
         !Number.isFinite(patch.capacity) ||
         patch.capacity <= 0
       ) {
-        this.logger.warn("modifyEvent: invalid capacity.");
-        return Err(new Error("Capacity must be a positive non-zero number."));
+        this.logger.warn("Create event: invalid capacity.");
+        return Err(EventValidationError("Capacity must be a positive non-zero number."));
       }
     }
-
-    // Service responsibility: Status validation (if provided)
-    if (patch.status !== undefined) {
-      const validStatuses: statusType[] = ["draft", "published", "cancelled", "past"];
-      if (!validStatuses.includes(patch.status)) {
-        this.logger.warn(`modifyEvent: invalid status ${patch.status}.`);
-        return Err(new Error("Invalid status."));
-      }
-    }
-
-    // Build updated event
-    const updatedEvent: IEvent = {
-      ...existing,
-      ...patch,
-      id: eventId, // Ensure ID doesn't change
-      updatedAt: patch.updatedAt || new Date().toISOString(),
-    };
-
-    // Auto-set status to "past" if start date has passed
-    if (new Date(updatedEvent.startDateTime) < new Date()) {
-      updatedEvent.status = "past";
-    }
-
-    return this.repository.editEvent(eventId, updatedEvent);
+    
+    return this.repository.editEvent(eventId, patch as IEvent);
   }
 
   async getEvent(eventId: string): Promise<Result<IEvent, Error>> {
