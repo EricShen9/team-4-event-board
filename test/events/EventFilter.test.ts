@@ -22,6 +22,13 @@ describe("GET /events — event list and filter", () => {
     const tomorrow = new Date(Date.now() + 86_400_000);
     const dayAfter = new Date(Date.now() + 2 * 86_400_000);
     return {
+      title: "Filter Test Event",
+      description: "An event for filter testing",
+      location: "Filter Hall",
+      category: "social",
+      startDateTime: tomorrow.toISOString().slice(0, 16),
+      endDateTime: dayAfter.toISOString().slice(0, 16),
+      ...overrides,
     };
   }
 
@@ -35,3 +42,22 @@ describe("GET /events — event list and filter", () => {
     await agent.post(`/events/${id}/publish`);
     return id;
   }
+
+    // ── Authentication ─────────────────────────────────────────────────
+
+  describe("authentication", () => {
+    it("redirects to login page when the user is not logged in", async () => {
+      const res = await request(app).get("/events");
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe("/login");
+    });
+
+    it("returns 401 page for unauthenticated HTMX request", async () => {
+      const res = await request(app)
+        .get("/events")
+        .set("HX-Request", "true");
+      expect(res.status).toBe(401);
+      expect(res.text).toContain("Please log in");
+      expect(res.text).not.toContain("<!DOCTYPE");
+    });
+  });
