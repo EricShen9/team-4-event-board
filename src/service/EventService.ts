@@ -4,7 +4,7 @@ import { Result, Ok, Err } from "../lib/result";
 import type { ILoggingService } from "./LoggingService";
 import type { statusType, IEvent, IRSVP, IEventRepository } from "../repository/EventRepository";
 import type { UserRole } from "../auth/User";
-import { EventValidationError } from "../lib/error";
+import { EventValidationError, EventNotFound } from "../lib/error";
 /**
  * Service interface — imported by EventController.
  */
