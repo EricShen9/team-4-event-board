@@ -61,3 +61,120 @@ describe("GET /events — event list and filter", () => {
       expect(res.text).not.toContain("<!DOCTYPE");
     });
   });
+
+  // ── No filters ───────────────────────────────────────
+
+  describe("no filters", () => {
+    it("returns 200 page and shows the event list page", async () => {
+      const agent = await loginAs("user@app.test", "password123");
+      const res = await agent.get("/events");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain("Events");
+    });
+
+    it("shows published events when no filters are applied", async () => {
+      const agent = await loginAs("staff@app.test", "password123");
+      await createPublishedEvent(agent, { title: "Unfiltered Event", category: "social" });
+
+      const userAgent = await loginAs("user@app.test", "password123");
+      const res = await userAgent.get("/events");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain("Unfiltered Event");
+    });
+
+    it("does not show draft events in the list", async () => {
+      const agent = await loginAs("staff@app.test", "password123");
+      // Create a draft but don't publish it
+      await agent.post("/events").type("form").send(validPayload({ title: "Secret Draft" }));
+      nextExpectedId++;
+
+      const userAgent = await loginAs("user@app.test", "password123");
+      const res = await userAgent.get("/events");
+      expect(res.status).toBe(200);
+      expect(res.text).not.toContain("Secret Draft");
+    });
+  });
+
+  // ── Category filter ───────────────────────────────────────────────
+
+  describe("category filter", () => {
+    it("returns only events matching the selected category", async () => {
+      const agent = await loginAs("staff@app.test", "password123");
+      await createPublishedEvent(agent, { title: "Swim Meet", category: "sports" });
+      await createPublishedEvent(agent, { title: "Pottery Showcase", category: "arts" });
+
+      const userAgent = await loginAs("user@app.test", "password123");
+      const res = await userAgent.get("/events?category=sports");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain("Swim Meet");
+      expect(res.text).not.toContain("Pottery Showcase");
+    });
+
+    it("returns events for educational category", async () => {
+      const agent = await loginAs("staff@app.test", "password123");
+      await createPublishedEvent(agent, { title: "CICS 326 Exam Review", category: "educational" });
+
+      const userAgent = await loginAs("user@app.test", "password123");
+      const res = await userAgent.get("/events?category=educational");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain("CICS 326 Exam Review");
+    });
+  });
+
+  // ── Timeframe filter ──────────────────────────────────────────────
+
+  describe("timeframe filter", () => {
+    it("returns events when filtering by upcoming", async () => {
+      const agent = await loginAs("staff@app.test", "password123");
+      await createPublishedEvent(agent, { title: "Upcoming Event" });
+
+      const userAgent = await loginAs("user@app.test", "password123");
+      const res = await userAgent.get("/events?timeframe=upcoming");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain("Upcoming Event");
+    });
+  });
+
+  // ── Invalid filter values ─────────────────────────────────────────
+
+  describe("invalid filter values", () => {
+    it("shows error for invalid category", async () => {
+      const agent = await loginAs("user@app.test", "password123");
+      const res = await agent.get("/events?category=fakecategory");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain("Invalid category");
+    });
+
+    it("shows error for invalid timeframe", async () => {
+      const agent = await loginAs("user@app.test", "password123");
+      const res = await agent.get("/events?timeframe=next_year");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain("Invalid timeframe");
+    });
+  });
+
+  // ── Combined filters ──────────────────────────────────────────────
+
+  describe("combined filters", () => {
+    it("filters by both category and timeframe", async () => {
+      const agent = await loginAs("staff@app.test", "password123");
+      await createPublishedEvent(agent, { title: "Combined Filter Event", category: "volunteer" });
+
+      const userAgent = await loginAs("user@app.test", "password123");
+      const res = await userAgent.get("/events?category=volunteer&timeframe=upcoming");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain("Combined Filter Event");
+    });
+  });
+
+  // ── Edge case ─────────────────────────────────────────────────────
+
+  describe("edge cases", () => {
+    it("returns all published events when empty filter values are passed", async () => {
+      const agent = await loginAs("user@app.test", "password123");
+      const res = await agent.get("/events?category=&timeframe=");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain("Events");
+    });
+  });
+});
