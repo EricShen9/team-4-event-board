@@ -281,10 +281,10 @@ class EventService implements IEventService {
     const validTimeframes = ["upcoming", "this_week", "this_weekend"];
 
     if (filters.category && !validCategories.includes(filters.category)) {
-      return Err(new Error(`Invalid category: ${filters.category}`));
+      return Err(EventValidationError(`Invalid category: ${filters.category}`));
     }
     if (filters.timeframe && !validTimeframes.includes(filters.timeframe)) {
-      return Err(new Error(`Invalid timeframe: ${filters.timeframe}`));
+      return Err(EventValidationError(`Invalid timeframe: ${filters.timeframe}`));
     }
 
     const allResult = await this.repository.getAllEvents();
