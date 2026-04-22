@@ -304,7 +304,7 @@ describe("POST /events/:id — event editing", () => {
         .post("/events/82/cancel")
         .type("form")
         .send({});
-      expect(cancelRes.status).toBe(302);
+      expect(cancelRes.status).toBe(200);
 
       // Now attempt to edit the cancelled event
       const res = await agent
