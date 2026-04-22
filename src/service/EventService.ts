@@ -256,17 +256,17 @@ class EventService implements IEventService {
 
   async getEventById(eventId: string, actingUserId: string, actingUserRole: UserRole): Promise<Result<IEvent, Error>> {
     if (!eventId || eventId.trim() === "") {
-      return Err(new Error("Event ID is required."));
+      return Err(EventValidationError("Event ID is required."));
     }
     const result = await this.repository.getEvent(eventId);
     if (!result.ok) {
-      return result;
+      return Err(EventNotFound(`Event ${eventId} not found.`));
     }
     const event = result.value;
 
     if (event.status === "draft") {
       if (event.organizerId !== actingUserId && actingUserRole !== "admin") {
-        return Err(new Error("Event not found."));
+        return Err(EventNotFound("Event not found."));
       }
     }
 
