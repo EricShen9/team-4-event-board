@@ -6,9 +6,54 @@ import { createComposedApp } from "../../src/composition";
 
 describe("POST /events/:id — event editing", () => {
   let app: Express;
+  let editableEventId: string;
+  let cancellableEventId: string;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     app = createComposedApp().getExpressApp();
+
+    // ── Setup: create and publish two events via the API ───────────
+    const agent = request.agent(app);
+    await agent
+      .post("/login")
+      .type("form")
+      .send({ email: "admin@app.test", password: "password123" });
+
+    const tomorrow = new Date(Date.now() + 86_400_000);
+    const dayAfter = new Date(Date.now() + 2 * 86_400_000);
+    const basePayload = {
+      description: "Event created for editing tests",
+      location: "Setup Hall",
+      category: "social",
+      startDateTime: tomorrow.toISOString().slice(0, 16),
+      endDateTime: dayAfter.toISOString().slice(0, 16),
+    };
+
+    // Event 1 — general editing tests (auto-ID "1")
+    const r1 = await agent
+      .post("/events")
+      .type("form")
+      .send({ ...basePayload, title: "Editable Event" });
+    expect(r1.status).toBe(200);
+    editableEventId = "1";
+
+    await agent
+      .post(`/events/${editableEventId}/publish`)
+      .type("form")
+      .send({});
+
+    // Event 2 — cancel-then-edit test (auto-ID "2")
+    const r2 = await agent
+      .post("/events")
+      .type("form")
+      .send({ ...basePayload, title: "Cancellable Event" });
+    expect(r2.status).toBe(200);
+    cancellableEventId = "2";
+
+    await agent
+      .post(`/events/${cancellableEventId}/publish`)
+      .type("form")
+      .send({});
   });
 
   // ── Helpers ────────────────────────────────────────────────────────
@@ -19,10 +64,6 @@ describe("POST /events/:id — event editing", () => {
     return agent;
   }
 
-  /**
-   * Baseline valid edit payload for seeded event 81 (published, tomorrow).
-   * Includes `status` which is required by the edit controller.
-   */
   function validEditPayload(overrides: Record<string, string> = {}) {
     const tomorrow = new Date(Date.now() + 86_400_000);
     const dayAfter = new Date(Date.now() + 2 * 86_400_000);
@@ -43,7 +84,7 @@ describe("POST /events/:id — event editing", () => {
   describe("authentication & authorization", () => {
     it("returns 401 when the user is not logged in", async () => {
       const res = await request(app)
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload());
 
@@ -56,7 +97,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("user@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload());
 
@@ -90,7 +131,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ title: "" }));
 
@@ -103,7 +144,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ description: "" }));
 
@@ -116,7 +157,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ location: "" }));
 
@@ -129,7 +170,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ category: "" }));
 
@@ -142,7 +183,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ startDateTime: "" }));
 
@@ -155,7 +196,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ endDateTime: "" }));
 
@@ -168,7 +209,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ status: "" }));
 
@@ -185,7 +226,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ status: "nonexistent" }));
 
@@ -204,7 +245,7 @@ describe("POST /events/:id — event editing", () => {
       const earlier = new Date(Date.now() + 86_400_000);
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(
           validEditPayload({
@@ -224,7 +265,7 @@ describe("POST /events/:id — event editing", () => {
         .slice(0, 16);
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(
           validEditPayload({
@@ -243,7 +284,7 @@ describe("POST /events/:id — event editing", () => {
       const tomorrow = new Date(Date.now() + 86_400_000);
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(
           validEditPayload({
@@ -260,7 +301,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ capacity: "0" }));
 
@@ -272,7 +313,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ capacity: "-5" }));
 
@@ -284,7 +325,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ capacity: "abc" }));
 
@@ -293,22 +334,21 @@ describe("POST /events/:id — event editing", () => {
     });
   });
 
-  // ── State validation — EventStateError (409) ───────────────────────
+  // ── State validation ───────────────────────────────────────────────
 
   describe("state validation", () => {
     it("returns 400 when editing a cancelled event", async () => {
       const agent = await loginAs("admin@app.test", "password123");
 
-      // Cancel event 82 first (seeded as published, owned by admin)
-      const cancelRes = await agent
-        .post("/events/82/cancel")
+      // Cancel the event (setup — uses the dedicated cancellable event)
+      await agent
+        .post(`/events/${cancellableEventId}/cancel`)
         .type("form")
         .send({});
-      expect(cancelRes.status).toBe(200);
 
       // Now attempt to edit the cancelled event
       const res = await agent
-        .post("/events/82")
+        .post(`/events/${cancellableEventId}`)
         .type("form")
         .send(validEditPayload());
 
@@ -325,7 +365,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ title: "Admin Updated Title" }));
 
@@ -339,7 +379,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("staff@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ title: "Staff Updated Title" }));
 
@@ -355,7 +395,7 @@ describe("POST /events/:id — event editing", () => {
       delete (payload as Record<string, string>).capacity;
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(payload);
 
@@ -367,7 +407,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ capacity: "50" }));
 
@@ -379,7 +419,7 @@ describe("POST /events/:id — event editing", () => {
       const agent = await loginAs("admin@app.test", "password123");
 
       const res = await agent
-        .post("/events/81")
+        .post(`/events/${editableEventId}`)
         .type("form")
         .send(validEditPayload({ status: "draft" }));
 
