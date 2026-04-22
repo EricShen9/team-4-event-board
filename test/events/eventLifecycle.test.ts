@@ -106,7 +106,7 @@ describe("Event Publishing and Cancellation", () => {
         // Publish button should no longer appear
         expect(res.text).not.toContain("Publish Event");
         // Response is an HTMX partial, not a full page
-        expect(res.text).toContain('id="event-status-controls"');
+        expect(res.text).toContain('id="event-status-controls-');;
         expect(res.text).not.toContain("<!DOCTYPE");
       });
     });
@@ -210,7 +210,7 @@ describe("Event Publishing and Cancellation", () => {
         expect(res.text).not.toContain("Publish Event");
         expect(res.text).not.toContain("Cancel Event");
         // Response is an HTMX partial, not a full page
-        expect(res.text).toContain('id="event-status-controls"');
+        expect(res.text).toContain('id="event-status-controls-');;
         expect(res.text).not.toContain("<!DOCTYPE");
       });
 
