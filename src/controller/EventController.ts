@@ -26,7 +26,7 @@ export interface IEventController {
   cancelEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void>;
   showOrganizerDashboard(res: Response, store: AppSessionStore): Promise<void>;
   showEventDetail(res: Response, eventId: string, store: AppSessionStore, pageError?: string | null): Promise<void>;
-  showEventList(res: Response, store: AppSessionStore, category?: string, timeframe?: string, pageError?: string | null): Promise<void>;
+  showEventList(res: Response, store: AppSessionStore, category?: string, timeframe?: string, pageError?: string | null, isHtmx?: boolean): Promise<void>;
 }
 
 /**
@@ -545,34 +545,37 @@ class EventController implements IEventController {
 
   // Feature 6: Category and Date Filter
 
+
   async showEventList(
     res: Response,
     store: AppSessionStore,
     category?: string,
     timeframe?: string,
     pageError: string | null = null,
+    isHtmx: boolean = false,
   ): Promise<void> {
     const session = touchAppSession(store);
 
     const result = await this.service.filterEvents({ category, timeframe });
 
-    if (result.ok === false) {
-      const err = result.value;
-      this.logger.warn(`showEventList: ${err.message}`);
-      res.render("events/list", {
-        session,
-        pageError: err.message,
-        events: [],
-        filters: { category: category ?? "", timeframe: timeframe ?? "" },
+    const events = result.ok ? result.value : [];
+    const error = result.ok ? pageError : result.value.message;
+    const filterState = { category: category ?? "", timeframe: timeframe ?? "" };
+
+    if (isHtmx) {
+      res.render("events/partials/event-list", {
+        events,
+        pageError: error,
+        layout: false,
       });
       return;
     }
 
     res.render("events/list", {
       session,
-      pageError,
-      events: result.value,
-      filters: { category: category ?? "", timeframe: timeframe ?? "" },
+      pageError: error,
+      events,
+      filters: filterState,
     });
   }
 }
