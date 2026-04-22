@@ -63,6 +63,7 @@ class EventController implements IEventController {
     if (error.name === "EventAlreadyExists") return 409;
     if (error.name === "EventValidationError") return 400;
     if (error.name === "EventStateError") return 409;
+    if (error.name === "InvalidStateTransition") return 409;
     
     return 500;
   }
@@ -366,7 +367,7 @@ class EventController implements IEventController {
     });
   }
 
-  // ── Lifecycle transitions (Feature 5, Sprint 1) ───────────────────
+  // ── Lifecycle transitions (Feature 5) ───────────────────
 
   async publishEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void> {
     const session = touchAppSession(store);
@@ -383,14 +384,33 @@ class EventController implements IEventController {
 
     if (result.ok === false) {
       const err = result.value;
-      const httpStatus = this.mapErrorStatus(err);
       this.logger.warn(`Publish event ${eventId} failed: ${err.message}`);
-      res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+
+      // Re-fetch event so we can render inline controls with the error
+      const eventResult = await this.service.getEvent(eventId);
+      if (eventResult.ok) {
+        res.render("events/partials/event-status-controls", {
+          event: eventResult.value,
+          session,
+          actionError: err.message,
+          actionSuccess: null,
+          layout: false,
+        });
+      } else {
+        const httpStatus = this.mapErrorStatus(err);
+        res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+      }
       return;
     }
 
     this.logger.info(`Event ${eventId} published by ${currentUser.userId}`);
-    res.redirect("/home");
+    res.render("events/partials/event-status-controls", {
+      event: result.value,
+      session,
+      actionError: null,
+      actionSuccess: "Event published successfully!",
+      layout: false,
+    });
   }
 
   async cancelEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void> {
@@ -408,17 +428,36 @@ class EventController implements IEventController {
 
     if (result.ok === false) {
       const err = result.value;
-      const httpStatus = this.mapErrorStatus(err);
       this.logger.warn(`Cancel event ${eventId} failed: ${err.message}`);
-      res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+
+      // Re-fetch event so we can render inline controls with the error
+      const eventResult = await this.service.getEvent(eventId);
+      if (eventResult.ok) {
+        res.render("events/partials/event-status-controls", {
+          event: eventResult.value,
+          session,
+          actionError: err.message,
+          actionSuccess: null,
+          layout: false,
+        });
+      } else {
+        const httpStatus = this.mapErrorStatus(err);
+        res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+      }
       return;
     }
 
     this.logger.info(`Event ${eventId} cancelled by ${currentUser.userId}`);
-    res.redirect("/home");
+    res.render("events/partials/event-status-controls", {
+      event: result.value,
+      session,
+      actionError: null,
+      actionSuccess: "Event cancelled.",
+      layout: false,
+    });
   }
 
- async showOrganizerDashboard(res: Response, store: AppSessionStore): Promise<void> {
+  async showOrganizerDashboard(res: Response, store: AppSessionStore): Promise<void> {
     const session = touchAppSession(store);
     const currentUser = getAuthenticatedUser(store);
 
