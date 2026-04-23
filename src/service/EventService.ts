@@ -4,7 +4,7 @@ import { Result, Ok, Err } from "../lib/result";
 import type { ILoggingService } from "./LoggingService";
 import type { statusType, IEvent, IRSVP, IEventRepository } from "../repository/EventRepository";
 import type { UserRole } from "../auth/User";
-
+import { EventValidationError, EventNotFound } from "../lib/error";
 /**
  * Service interface — imported by EventController.
  */
@@ -55,23 +55,14 @@ class EventService implements IEventService {
   }
 
   async createEvent(eventForm: Partial<IEvent>): Promise<Result<IEvent, Error>> {
-    const now = new Date();
-    const start = new Date(eventForm.startDateTime!);
-    const end = new Date(eventForm.endDateTime!);
-
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      this.logger.warn("Create event: invalid date/time format.");
-      return Err(new Error("Invalid date/time format."));
-    }
-    if (start >= end) {
+    if (eventForm.startDateTime! >= eventForm.endDateTime!) {
       this.logger.warn("Create event: start is not before end.");
-      return Err(new Error("Event start must be before end time."));
+      return Err(EventValidationError("Event start must be before end time."));
     }
-    if (start < now) {
+    if (eventForm.startDateTime! < eventForm.createdAt!) {
       this.logger.warn("Create event: start is before current time.");
-      return Err(new Error("Event start cannot be before current time."));
+      return Err(EventValidationError("Event start cannot be before current time."));
     }
-
     if (eventForm.capacity !== undefined) {
       if (
         typeof eventForm.capacity !== "number" ||
@@ -79,124 +70,58 @@ class EventService implements IEventService {
         eventForm.capacity <= 0
       ) {
         this.logger.warn("Create event: invalid capacity.");
-        return Err(new Error("Capacity must be a positive non-zero number."));
+        return Err(EventValidationError("Capacity must be a positive non-zero number."));
       }
     }
 
-    const nowISO = now.toISOString();
-    const event: IEvent = {
-      id: this.generateId(),
-      organizerId: eventForm.organizerId ?? "",
-      title: eventForm.title!.trim(),
-      description: eventForm.description?.trim() ?? "",
-      location: eventForm.location?.trim() ?? "",
-      category: eventForm.category?.trim() ?? "",
-      status: "draft",
-      startDateTime: start.toISOString(),
-      endDateTime: end.toISOString(),
-      capacity: eventForm.capacity,
-      createdAt: eventForm.createdAt ?? nowISO,
-      updatedAt: eventForm.updatedAt ?? nowISO,
-    };
-    return this.repository.addEvent(event);
+    return this.repository.addEvent(eventForm as IEvent);
   }
 
   async modifyEvent(
     eventId: string,
     patch: Partial<IEvent>,
   ): Promise<Result<IEvent, Error>> {
-    // Fetch existing event
+    // Fetch existing event first to check business rules
     const existingResult = await this.repository.getEvent(eventId);
     if (!existingResult.ok) {
-      this.logger.warn(`modifyEvent: event ${eventId} not found.`);
       return existingResult;
     }
-
-    const existing = existingResult.value;
+    
+    const existingEvent = existingResult.value;
     const now = new Date();
-
-    // Service responsibility: Validate state-based rules first
-    if (existing.status === "cancelled") {
-      this.logger.warn("modifyEvent: cannot modify cancelled event.");
-      return Err(new Error("Cannot modify a cancelled event."));
+    
+    // Business logic: State-based rules
+    if (existingEvent.status === "cancelled") {
+      this.logger.warn(`modifyEvent: cannot modify cancelled event ${eventId}.`);
+      return Err(EventValidationError("Cannot modify a cancelled event."));
+    }
+    if (new Date(existingEvent.startDateTime) < now) {
+      this.logger.warn(`modifyEvent: cannot modify past event ${eventId}.`);
+      return Err(EventValidationError("Cannot modify a past event."));
     }
     
-    if (new Date(existing.startDateTime) < now) {
-      this.logger.warn("modifyEvent: cannot modify past event.");
-      return Err(new Error("Cannot modify a past event."));
+    // Business logic: Chronology validation
+    if (patch.startDateTime! >= patch.endDateTime!) {
+      this.logger.warn("Create event: start is not before end.");
+      return Err(EventValidationError("Event start must be before end time."));
+    }
+    if (patch.startDateTime! < patch.updatedAt!) {
+      this.logger.warn("Create event: start is before current time.");
+      return Err(EventValidationError("Event start cannot be before current time."));
     }
 
-    // Service responsibility: Date format validation (if provided)
-    if (patch.startDateTime) {
-      const newStart = new Date(patch.startDateTime);
-      if (Number.isNaN(newStart.getTime())) {
-        this.logger.warn("modifyEvent: invalid start date/time format.");
-        return Err(new Error("Invalid start date/time format."));
-      }
-    }
-
-    if (patch.endDateTime) {
-      const newEnd = new Date(patch.endDateTime);
-      if (Number.isNaN(newEnd.getTime())) {
-        this.logger.warn("modifyEvent: invalid end date/time format.");
-        return Err(new Error("Invalid end date/time format."));
-      }
-    }
-
-    // Service responsibility: Chronology validation
-    const effectiveStart = patch.startDateTime
-      ? new Date(patch.startDateTime)
-      : new Date(existing.startDateTime);
-    const effectiveEnd = patch.endDateTime
-      ? new Date(patch.endDateTime)
-      : new Date(existing.endDateTime);
-
-    if (effectiveStart >= effectiveEnd) {
-      this.logger.warn("modifyEvent: start must be before end.");
-      return Err(new Error("Event start must be before end time."));
-    }
-
-    // Service responsibility: Past date validation (if changed)
-    if (patch.startDateTime && effectiveStart < now) {
-      this.logger.warn("modifyEvent: start date cannot be in the past.");
-      return Err(new Error("Start date/time cannot be in the past."));
-    }
-
-    // Service responsibility: Capacity validation (if provided)
     if (patch.capacity !== undefined) {
       if (
         typeof patch.capacity !== "number" ||
         !Number.isFinite(patch.capacity) ||
         patch.capacity <= 0
       ) {
-        this.logger.warn("modifyEvent: invalid capacity.");
-        return Err(new Error("Capacity must be a positive non-zero number."));
+        this.logger.warn("Create event: invalid capacity.");
+        return Err(EventValidationError("Capacity must be a positive non-zero number."));
       }
     }
-
-    // Service responsibility: Status validation (if provided)
-    if (patch.status !== undefined) {
-      const validStatuses: statusType[] = ["draft", "published", "cancelled", "past"];
-      if (!validStatuses.includes(patch.status)) {
-        this.logger.warn(`modifyEvent: invalid status ${patch.status}.`);
-        return Err(new Error("Invalid status."));
-      }
-    }
-
-    // Build updated event
-    const updatedEvent: IEvent = {
-      ...existing,
-      ...patch,
-      id: eventId, // Ensure ID doesn't change
-      updatedAt: patch.updatedAt || new Date().toISOString(),
-    };
-
-    // Auto-set status to "past" if start date has passed
-    if (new Date(updatedEvent.startDateTime) < new Date()) {
-      updatedEvent.status = "past";
-    }
-
-    return this.repository.editEvent(eventId, updatedEvent);
+    
+    return this.repository.editEvent(eventId, patch as IEvent);
   }
 
   async getEvent(eventId: string): Promise<Result<IEvent, Error>> {
@@ -331,17 +256,17 @@ class EventService implements IEventService {
 
   async getEventById(eventId: string, actingUserId: string, actingUserRole: UserRole): Promise<Result<IEvent, Error>> {
     if (!eventId || eventId.trim() === "") {
-      return Err(new Error("Event ID is required."));
+      return Err(EventValidationError("Event ID is required."));
     }
     const result = await this.repository.getEvent(eventId);
     if (!result.ok) {
-      return result;
+      return Err(EventNotFound(`Event ${eventId} not found.`));
     }
     const event = result.value;
 
     if (event.status === "draft") {
       if (event.organizerId !== actingUserId && actingUserRole !== "admin") {
-        return Err(new Error("Event not found."));
+        return Err(EventNotFound("Event not found."));
       }
     }
 
@@ -356,10 +281,10 @@ class EventService implements IEventService {
     const validTimeframes = ["upcoming", "this_week", "this_weekend"];
 
     if (filters.category && !validCategories.includes(filters.category)) {
-      return Err(new Error(`Invalid category: ${filters.category}`));
+      return Err(EventValidationError(`Invalid category: ${filters.category}`));
     }
     if (filters.timeframe && !validTimeframes.includes(filters.timeframe)) {
-      return Err(new Error(`Invalid timeframe: ${filters.timeframe}`));
+      return Err(EventValidationError(`Invalid timeframe: ${filters.timeframe}`));
     }
 
     const allResult = await this.repository.getAllEvents();

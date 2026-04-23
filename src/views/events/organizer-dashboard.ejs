@@ -15,6 +15,7 @@
         <th>Date</th>
         <th>Category</th>
         <th>Attending / Capacity</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -24,6 +25,7 @@
           <td><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
           <td><%= row.event.category %></td>
           <td><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
+          <td><%- include("./partials/event-status-controls", { event: row.event, session: session, actionError: null, actionSuccess: null }) %></td>
         </tr>
       <% }); %>
     </tbody>
@@ -41,6 +43,7 @@
         <th>Date</th>
         <th>Category</th>
         <th>Attending / Capacity</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -50,6 +53,7 @@
           <td><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
           <td><%= row.event.category %></td>
           <td><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
+          <td><%- include("./partials/event-status-controls", { event: row.event, session: session, actionError: null, actionSuccess: null }) %></td>
         </tr>
       <% }); %>
     </tbody>

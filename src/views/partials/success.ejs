@@ -1,0 +1,11 @@
+<div id="form-status">
+  <section class="mb-4 p-4 rounded-xl border border-green-200 bg-green-50 text-green-800" aria-live="polite">
+    <h3 class="text-base font-semibold mb-1">Success</h3>
+    <p class="mb-0 text-sm"><span class="mr-1">✓</span> <%= message %></p>
+  </section>
+  <script>
+    setTimeout(function() {
+      window.location.href = '<%= redirectUrl %>';
+    }, 2000);
+  </script>
+</div>

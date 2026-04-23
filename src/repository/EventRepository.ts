@@ -14,7 +14,7 @@ export interface IEvent {
   endDateTime: string; // ISO
   capacity?: number;
   createdAt: string; // ISO
-  updatedAt: string; // ISO
+  updatedAt?: string; // ISO
   users?: Array<Set<string>>; // original shape had `user: Set[]` — using a permissive replacement
 }
 
