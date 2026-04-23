@@ -13,23 +13,36 @@ export interface IMyRSVPDashboard {
   past: Array<{ event: IEvent; rsvp: IRSVP }>;
 }
 
-
+export interface IRSVPDetailState {
+  event: IEvent;
+  currentRSVP: IRSVP | null;
+  attendeeCount: number;
+  waitlistPosition: number | null;
+  canInteract: boolean;
+}
 
 export interface IRSVPService {
   cancelRSVPWithPromotion(
     eventId: string,
     userId: string,
   ): Promise<Result<{ cancelled: IRSVP; promoted?: IRSVP }, Error>>;
+
   toggleRSVP(
-  eventId: string,
-  userId: string,
-  role: UserRole,
-): Promise<Result<IRSVP, Error>>;
+    eventId: string,
+    userId: string,
+    role: UserRole,
+  ): Promise<Result<IRSVP, Error>>;
 
   getWaitlistPosition(
     eventId: string,
     userId: string,
   ): Promise<Result<number | null, Error>>;
+
+  getRSVPDetailState(
+    eventId: string,
+    userId: string,
+    role: UserRole,
+  ): Promise<Result<IRSVPDetailState, Error>>;
 
   getMyRSVPDashboard(
     userId: string,
