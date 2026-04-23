@@ -17,8 +17,14 @@ import {
  * Controller interface
  */
 export interface IEventController {
-  showSearchPage(res: Response, session: IAppBrowserSession, query: string, pageError?: string | null): Promise<void>;
-  showCreateEventForm(res: Response, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
+showSearchPage(
+  res: Response,
+  session: IAppBrowserSession,
+  query: string,
+  pageError?: string | null,
+  isHtmx?: boolean,
+): Promise<void>;
+showCreateEventForm(res: Response, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
   createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
   showEditEventForm(res: Response, eventId: string, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
   modifyEventFromForm(res: Response, eventId: string, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
@@ -59,6 +65,7 @@ class EventController implements IEventController {
     
     // Event errors
     if (error.name === "EventAuthorizationError") return 403;
+    if (error.name === "SearchValidationError") return 400;
     if (error.name === "EventNotFound") return 404;
     if (error.name === "EventAlreadyExists") return 409;
     if (error.name === "EventValidationError") return 400;
@@ -339,33 +346,55 @@ class EventController implements IEventController {
   }
 
   async showSearchPage(
-    res: Response,
-    session: IAppBrowserSession,
-    query: string,
-    pageError: string | null = null,
-  ): Promise<void> {
-    const result = await this.service.searchEvents(query);
+  res: Response,
+  session: IAppBrowserSession,
+  query: string,
+  pageError: string | null = null,
+  isHtmx: boolean = false,
+): Promise<void> {
+  const result = await this.service.searchEvents(query);
 
-    if (result.ok === false) {
-      const err = result.value;
-      const status = this.mapErrorStatus(err);
-      this.logger.warn(`Search events failed: ${err.message}`);
-      res.status(status).render("events/search", {
-        session,
-        pageError: err.message,
+  if (result.ok === false) {
+    const err = result.value;
+    const status = this.mapErrorStatus(err);
+    this.logger.warn(`Search events failed: ${err.message}`);
+
+    if (isHtmx) {
+      res.status(status).render("events/partials/search-results", {
         query,
+        pageError: err.message,
         events: [],
+        layout: false,
       });
       return;
     }
 
-    res.render("events/search", {
+    res.status(status).render("events/search", {
       session,
-      pageError,
+      pageError: err.message,
       query,
-      events: result.value,
+      events: [],
     });
+    return;
   }
+
+  if (isHtmx) {
+    res.render("events/partials/search-results", {
+      query,
+      pageError: null,
+      events: result.value,
+      layout: false,
+    });
+    return;
+  }
+
+  res.render("events/search", {
+    session,
+    pageError,
+    query,
+    events: result.value,
+  });
+}
 
   // ── Lifecycle transitions (Feature 5) ───────────────────
 
