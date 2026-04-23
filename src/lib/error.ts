@@ -55,3 +55,11 @@ export const RSVPStateError = (message: string): RSVPError => ({
   name: "RSVPStateError",
   message,
 });
+
+export type SearchError =
+  | { name: "SearchValidationError"; message: string };
+
+export const SearchValidationError = (message: string): SearchError => ({
+  name: "SearchValidationError",
+  message,
+});

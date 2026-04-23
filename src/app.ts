@@ -321,12 +321,14 @@ class ExpressApp implements IApp {
         this.logger.info(`GET /events/search?q=${query}`);
 
         await this.eventController.showSearchPage(
-          res,
-          browserSession,
-          query,
-          null,
-          req.get("HX-Request") === "true",
-);
+        res,
+        browserSession,
+        query,
+        null,
+        req.get("HX-Request") === "true",
+      );
+       
+
       }),
     );
     

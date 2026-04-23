@@ -24,7 +24,7 @@ showSearchPage(
   pageError?: string | null,
   isHtmx?: boolean,
 ): Promise<void>;
-  showCreateEventForm(res: Response, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
+showCreateEventForm(res: Response, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
   createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
   showEditEventForm(res: Response, eventId: string, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
   modifyEventFromForm(res: Response, eventId: string, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
@@ -65,6 +65,7 @@ class EventController implements IEventController {
     
     // Event errors
     if (error.name === "EventAuthorizationError") return 403;
+    if (error.name === "SearchValidationError") return 400;
     if (error.name === "EventNotFound") return 404;
     if (error.name === "EventAlreadyExists") return 409;
     if (error.name === "EventValidationError") return 400;
