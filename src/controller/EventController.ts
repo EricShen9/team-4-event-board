@@ -545,7 +545,6 @@ class EventController implements IEventController {
 
   // Feature 6: Category and Date Filter
 
-
   async showEventList(
     res: Response,
     store: AppSessionStore,
@@ -559,7 +558,7 @@ class EventController implements IEventController {
     const result = await this.service.filterEvents({ category, timeframe });
 
     const events = result.ok ? result.value : [];
-    const error = result.ok ? null : result.value.message;
+    const error = result.ok ? null : (result.value as Error).message;
     const filterState = { category: category ?? "", timeframe: timeframe ?? "" };
 
     if (isHtmx) {
