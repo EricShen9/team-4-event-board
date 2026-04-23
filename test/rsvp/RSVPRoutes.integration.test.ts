@@ -58,6 +58,21 @@ describe("RSVP routes integration", () => {
     expect(response.headers.location).toBe("/login");
   });
 
+    it("returns 403 when staff tries to RSVP to an event", async () => {
+    const app = makeApp();
+    const staffAgent = request.agent(app);
+
+    await loginAsStaff(staffAgent);
+    const eventId = await createPublishedEvent(staffAgent);
+
+    const response = await staffAgent
+      .post(`/events/${eventId}/rsvp`)
+      .set("Referer", `http://127.0.0.1:3443/events/${eventId}`);
+
+    expect(response.status).toBe(403);
+    expect(response.text).toContain("Only members can RSVP.");
+  });
+
   it("allows an authenticated user to view the RSVP dashboard", async () => {
     const app = makeApp();
     const agent = request.agent(app);
@@ -124,9 +139,12 @@ describe("RSVP routes integration", () => {
       .set("Referer", "http://127.0.0.1:3443/my-rsvps");
 
     expect(response.status).toBe(200);
-    expect(response.text).toContain("My RSVPs");
+    expect(response.text).toContain('id="past-rsvps"');
+    expect(response.text).toContain('hx-swap-oob="outerHTML"');
     expect(response.text).toContain("Past / Cancelled");
     expect(response.text).toContain("RSVP Test Event");
+    expect(response.text).toContain("cancelled");
+    expect(response.text).not.toContain("My RSVPs");
   });
 
   it("returns 401 for unauthenticated RSVP toggle requests", async () => {

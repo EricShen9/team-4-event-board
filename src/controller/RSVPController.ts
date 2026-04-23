@@ -25,6 +25,12 @@ class RSVPController implements IRSVPController {
     private readonly rsvpService: IRSVPService,
     private readonly logger: ILoggingService,
   ) {}
+  private mapToggleErrorStatus(error: Error): number {
+    if (error.name === "RSVPAuthorizationError") return 403;
+    if (error.name === "RSVPNotFound") return 404;
+    if (error.name === "RSVPStateError") return 409;
+    return 400;
+  }
 
   async toggleRSVPFromRequest(
     req: Request,
@@ -49,8 +55,9 @@ class RSVPController implements IRSVPController {
     );
 
     if (result.ok === false) {
+      const status = this.mapToggleErrorStatus(result.value);
       this.logger.warn(`RSVP toggle failed: ${result.value.message}`);
-      res.status(400).render("partials/error", {
+      res.status(status).render("partials/error", {
         message: result.value.message,
         layout: false,
       });
