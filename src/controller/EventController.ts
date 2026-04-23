@@ -559,7 +559,7 @@ class EventController implements IEventController {
     const result = await this.service.filterEvents({ category, timeframe });
 
     const events = result.ok ? result.value : [];
-    const error = result.ok ? pageError : result.value.message;
+    const error = result.ok ? null : result.value.message;
     const filterState = { category: category ?? "", timeframe: timeframe ?? "" };
 
     if (isHtmx) {
