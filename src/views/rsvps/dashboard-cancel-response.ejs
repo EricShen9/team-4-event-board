@@ -1,0 +1,19 @@
+<div id="rsvp-row-<%= cancelledRsvpId %>"></div>
+
+<section id="past-rsvps" hx-swap-oob="outerHTML">
+  <h2>Past / Cancelled</h2>
+  <% if (dashboard.past.length === 0) { %>
+    <p>No past or cancelled RSVPs.</p>
+  <% } %>
+
+  <% dashboard.past.forEach(({ event, rsvp }) => { %>
+    <div class="entry-card">
+      <h3><%= event.title %></h3>
+      <p><strong>RSVP status:</strong> <%= rsvp.status %></p>
+      <p><strong>Event status:</strong> <%= event.status %></p>
+      <p><strong>Category:</strong> <%= event.category %></p>
+      <p><strong>Location:</strong> <%= event.location %></p>
+      <p><strong>Starts:</strong> <%= new Date(event.startDateTime).toLocaleString() %></p>
+    </div>
+  <% }) %>
+</section>

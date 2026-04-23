@@ -61,7 +61,6 @@ class RSVPController implements IRSVPController {
     const referer = req.get("Referer") ?? "";
 
     if (isHtmxRequest && referer.includes("/my-rsvps")) {
-      const session = touchAppSession(store);
       const dashboardResult = await this.rsvpService.getMyRSVPDashboard(
         currentUser.userId,
         currentUser.role,
@@ -78,8 +77,10 @@ class RSVPController implements IRSVPController {
         return;
       }
 
-      res.status(200).render("rsvps/dashboard", {
-        session,
+      const cancelledRsvpId = result.value.id;
+
+      res.status(200).render("rsvps/dashboard-cancel-response", {
+        cancelledRsvpId,
         dashboard: dashboardResult.value,
         layout: false,
       });
