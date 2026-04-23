@@ -8,6 +8,7 @@ import {
   RSVPNotFound,
   RSVPStateError,
 } from "../lib/error";
+
 export interface IMyRSVPDashboard {
   upcoming: Array<{ event: IEvent; rsvp: IRSVP }>;
   past: Array<{ event: IEvent; rsvp: IRSVP }>;
@@ -57,7 +58,7 @@ class RSVPService implements IRSVPService {
     private readonly logger: ILoggingService,
   ) {}
 
-    async cancelRSVPWithPromotion(
+  async cancelRSVPWithPromotion(
     eventId: string,
     userId: string,
   ): Promise<Result<{ cancelled: IRSVP; promoted?: IRSVP }, Error>> {
@@ -150,10 +151,7 @@ class RSVPService implements IRSVPService {
     }
 
     const waitlisted = eventRSVPsResult.value
-      .filter(
-        (rsvp) =>
-          rsvp.status === ("waitlisted" ),
-      )
+      .filter((rsvp) => rsvp.status === "waitlisted")
       .sort(
         (a, b) =>
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -168,7 +166,60 @@ class RSVPService implements IRSVPService {
     return Ok(index + 1);
   }
 
-    async toggleRSVP(
+  async getRSVPDetailState(
+    eventId: string,
+    userId: string,
+    role: UserRole,
+  ): Promise<Result<IRSVPDetailState, Error>> {
+    const eventResult = await this.eventRepository.getEvent(eventId);
+    if (eventResult.ok === false) {
+      return Err(eventResult.value);
+    }
+
+    const event = eventResult.value;
+
+    const currentRSVPResult = await this.rsvpRepository.getRSVPByUserAndEvent(
+      userId,
+      eventId,
+    );
+    if (currentRSVPResult.ok === false) {
+      return Err(currentRSVPResult.value);
+    }
+
+    const allRSVPsResult = await this.rsvpRepository.getRSVPsByEvent(eventId);
+    if (allRSVPsResult.ok === false) {
+      return Err(allRSVPsResult.value);
+    }
+
+    const attendeeCount = allRSVPsResult.value.filter(
+      (rsvp) => rsvp.status === "going",
+    ).length;
+
+    let waitlistPosition: number | null = null;
+    if (currentRSVPResult.value?.status === "waitlisted") {
+      const waitlistResult = await this.getWaitlistPosition(eventId, userId);
+      if (waitlistResult.ok === false) {
+        return Err(waitlistResult.value);
+      }
+      waitlistPosition = waitlistResult.value;
+    }
+
+    const eventEnded = new Date(event.endDateTime) < new Date();
+    const canInteract =
+      role === "user" &&
+      event.status === "published" &&
+      !eventEnded;
+
+    return Ok({
+      event,
+      currentRSVP: currentRSVPResult.value,
+      attendeeCount,
+      waitlistPosition,
+      canInteract,
+    });
+  }
+
+  async toggleRSVP(
     eventId: string,
     userId: string,
     role: UserRole,
@@ -208,43 +259,6 @@ class RSVPService implements IRSVPService {
 
     const existing = existingResult.value;
 
-    // Case 1: No RSVP → create new
-    if (!existing) {
-      const eventRSVPsResult = await this.rsvpRepository.getRSVPsByEvent(eventId);
-      if (eventRSVPsResult.ok === false) {
-        return Err(eventRSVPsResult.value);
-      }
-
-      const goingCount = eventRSVPsResult.value.filter(
-        (r) => r.status === "going",
-      ).length;
-
-      const isFull =
-        typeof event.capacity === "number"
-          ? goingCount >= event.capacity
-          : false;
-
-      const newRSVP: IRSVP = {
-        id: crypto.randomUUID(),
-        eventId,
-        userId,
-        status: isFull ? "waitlisted" : "going",
-        createdAt: new Date().toISOString(),
-      };
-
-      return this.rsvpRepository.addRSVP(newRSVP);
-    }
-
-    // Case 2: Active → cancel
-    if (existing.status === "going" || existing.status === "waitlisted") {
-      const result = await this.cancelRSVPWithPromotion(eventId, userId);
-      if (result.ok === false) {
-        return Err(result.value);
-      }
-      return Ok(result.value.cancelled);
-    }
-
-    // Case 3: Cancelled → reactivate
     const eventRSVPsResult = await this.rsvpRepository.getRSVPsByEvent(eventId);
     if (eventRSVPsResult.ok === false) {
       return Err(eventRSVPsResult.value);
@@ -258,6 +272,26 @@ class RSVPService implements IRSVPService {
       typeof event.capacity === "number"
         ? goingCount >= event.capacity
         : false;
+
+    if (!existing) {
+      const newRSVP: IRSVP = {
+        id: crypto.randomUUID(),
+        eventId,
+        userId,
+        status: isFull ? "waitlisted" : "going",
+        createdAt: new Date().toISOString(),
+      };
+
+      return this.rsvpRepository.addRSVP(newRSVP);
+    }
+
+    if (existing.status === "going" || existing.status === "waitlisted") {
+      const result = await this.cancelRSVPWithPromotion(eventId, userId);
+      if (result.ok === false) {
+        return Err(result.value);
+      }
+      return Ok(result.value.cancelled);
+    }
 
     return this.rsvpRepository.updateRSVPStatus(
       existing.id,
@@ -273,7 +307,7 @@ class RSVPService implements IRSVPService {
       this.logger.warn(
         `getMyRSVPDashboard: role ${role} is not allowed to access member RSVP dashboard.`,
       );
-      return Err(new Error("Only members can access the RSVP dashboard."));
+      return Err(RSVPAuthorizationError("Only members can access the RSVP dashboard."));
     }
 
     const rsvpsResult = await this.rsvpRepository.getRSVPsByUser(userId);
@@ -301,7 +335,8 @@ class RSVPService implements IRSVPService {
         past.push({ event, rsvp });
       } else {
         upcoming.push({ event, rsvp });
-      }}
+      }
+    }
 
     upcoming.sort(
       (a, b) =>
