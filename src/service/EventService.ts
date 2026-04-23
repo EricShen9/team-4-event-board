@@ -4,7 +4,7 @@ import { Result, Ok, Err } from "../lib/result";
 import type { ILoggingService } from "./LoggingService";
 import type { statusType, IEvent, IRSVP, IEventRepository } from "../repository/EventRepository";
 import type { UserRole } from "../auth/User";
-import { EventValidationError } from "../lib/error";
+import { EventValidationError, EventNotFound } from "../lib/error";
 /**
  * Service interface — imported by EventController.
  */
@@ -256,17 +256,17 @@ class EventService implements IEventService {
 
   async getEventById(eventId: string, actingUserId: string, actingUserRole: UserRole): Promise<Result<IEvent, Error>> {
     if (!eventId || eventId.trim() === "") {
-      return Err(new Error("Event ID is required."));
+      return Err(EventValidationError("Event ID is required."));
     }
     const result = await this.repository.getEvent(eventId);
     if (!result.ok) {
-      return result;
+      return Err(EventNotFound(`Event ${eventId} not found.`));
     }
     const event = result.value;
 
     if (event.status === "draft") {
       if (event.organizerId !== actingUserId && actingUserRole !== "admin") {
-        return Err(new Error("Event not found."));
+        return Err(EventNotFound("Event not found."));
       }
     }
 
@@ -281,10 +281,10 @@ class EventService implements IEventService {
     const validTimeframes = ["upcoming", "this_week", "this_weekend"];
 
     if (filters.category && !validCategories.includes(filters.category)) {
-      return Err(new Error(`Invalid category: ${filters.category}`));
+      return Err(EventValidationError(`Invalid category: ${filters.category}`));
     }
     if (filters.timeframe && !validTimeframes.includes(filters.timeframe)) {
-      return Err(new Error(`Invalid timeframe: ${filters.timeframe}`));
+      return Err(EventValidationError(`Invalid timeframe: ${filters.timeframe}`));
     }
 
     const allResult = await this.repository.getAllEvents();
