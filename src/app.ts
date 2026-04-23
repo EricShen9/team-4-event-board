@@ -244,6 +244,23 @@ class ExpressApp implements IApp {
         await this.eventController.showEditEventForm(res, eventId, browserSession);
       }),
     );
+    this.app.get(
+  "/events/:id/rsvp-controls",
+  asyncHandler(async (req, res) => {
+    if (!this.requireAuthenticated(req, res)) {
+      return;
+    }
+
+    const eventId = typeof req.params.id === "string" ? req.params.id : "";
+    const store = sessionStore(req);
+
+    await this.rsvpController.showRSVPControls(
+      res,
+      eventId,
+      store,
+    );
+  }),
+);
 
     this.app.post(
   "/events/:id/rsvp",
@@ -256,6 +273,7 @@ class ExpressApp implements IApp {
     const store = sessionStore(req);
 
     await this.rsvpController.toggleRSVPFromRequest(
+      req,
       res,
       eventId,
       store,
@@ -302,7 +320,15 @@ class ExpressApp implements IApp {
         const browserSession = recordPageView(store);
         this.logger.info(`GET /events/search?q=${query}`);
 
-        await this.eventController.showSearchPage(res, browserSession, query);
+        await this.eventController.showSearchPage(
+        res,
+        browserSession,
+        query,
+        null,
+        req.get("HX-Request") === "true",
+      );
+       
+
       }),
     );
     
@@ -489,16 +515,20 @@ class ExpressApp implements IApp {
       asyncHandler(async (req, res) => {
         if (!this.requireAuthenticated(req, res)) return;
 
-        const category = 
+        const category =
           typeof req.query.category === "string" ? req.query.category : undefined;
         const timeframe =
           typeof req.query.timeframe === "string" ? req.query.timeframe : undefined;
+
+        const isHtmx = this.isHtmxRequest(req);
 
         await this.eventController.showEventList(
           res,
           sessionStore(req),
           category,
           timeframe,
+          undefined,
+          isHtmx,
         );
       }),
     );

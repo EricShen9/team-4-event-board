@@ -10,4 +10,6 @@ module.exports = {
   },
   clearMocks: true,
   collectCoverageFrom: ['src/**/*.ts'],
+  silent: true,  // <- Hides all console output from tests
+  verbose: false, // <- Reduces output detail
 }

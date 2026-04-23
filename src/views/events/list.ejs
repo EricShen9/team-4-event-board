@@ -1,8 +1,14 @@
 <section class="max-w-3xl mb-5 p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
   <h1 class="text-3xl font-bold text-slate-900 mb-4">Events</h1>
 
-  <!-- Filter bar -->
-  <form method="get" action="/events" class="flex flex-wrap gap-3 mb-6">
+  <!-- Filter bar with HTMX -->
+  <form
+    hx-get="/events"
+    hx-target="#event-list"
+    hx-swap="outerHTML"
+    hx-push-url="true"
+    class="flex flex-wrap gap-3 mb-6"
+  >
     <select name="category" class="px-3 py-2 rounded-lg border border-slate-200 text-sm">
       <option value="">All Categories</option>
       <option value="social" <%= filters.category === 'social' ? 'selected' : '' %>>Social</option>
@@ -30,25 +36,5 @@
     <% } %>
   </form>
 
-  <% if (pageError) { %>
-    <%- include("../partials/error", { message: pageError }) %>
-  <% } %>
-
-  <!-- Event list -->
-  <% if (events.length === 0) { %>
-    <p class="text-slate-500">No events found.</p>
-  <% } else { %>
-    <div class="space-y-4">
-      <% events.forEach(function(event) { %>
-        <a href="/events/<%= event.id %>" class="block p-4 border border-slate-200 rounded-xl hover:bg-slate-50 no-underline">
-          <div class="flex items-center justify-between mb-1">
-            <h2 class="text-lg font-semibold text-slate-900"><%= event.title %></h2>
-            <span class="text-xs px-2 py-1 rounded bg-slate-100 text-slate-600"><%= event.category %></span>
-          </div>
-          <p class="text-sm text-slate-500 mb-1"><%= event.location %> &middot; <%= new Date(event.startDateTime).toLocaleDateString() %></p>
-          <p class="text-sm text-slate-600"><%= event.description.substring(0, 100) %><%= event.description.length > 100 ? '...' : '' %></p>
-        </a>
-      <% }) %>
-    </div>
-  <% } %>
+  <%- include("./partials/event-list", { events, pageError }) %>
 </section>

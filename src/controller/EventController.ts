@@ -8,17 +8,23 @@ import {
   type AppSessionStore,
 } from "../session/AppSession";
 import type { ILoggingService } from "../service/LoggingService";
-import type { Result } from "../lib/result";
 import type { IEventService } from "../service/EventService";
 import type { statusType, IEvent, IRSVP } from "../repository/EventRepository";
-
-
+import { 
+  EventValidationError, 
+} from "../lib/error"
 /**
  * Controller interface
  */
 export interface IEventController {
-  showSearchPage(res: Response, session: IAppBrowserSession, query: string, pageError?: string | null): Promise<void>;
-  showCreateEventForm(res: Response, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
+showSearchPage(
+  res: Response,
+  session: IAppBrowserSession,
+  query: string,
+  pageError?: string | null,
+  isHtmx?: boolean,
+): Promise<void>;
+showCreateEventForm(res: Response, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
   createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
   showEditEventForm(res: Response, eventId: string, session: IAppBrowserSession, pageError?: string | null): Promise<void>;
   modifyEventFromForm(res: Response, eventId: string, input: Partial<IEvent>, store: AppSessionStore): Promise<void>;
@@ -26,7 +32,7 @@ export interface IEventController {
   cancelEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void>;
   showOrganizerDashboard(res: Response, store: AppSessionStore): Promise<void>;
   showEventDetail(res: Response, eventId: string, store: AppSessionStore, pageError?: string | null): Promise<void>;
-  showEventList(res: Response, store: AppSessionStore, category?: string, timeframe?: string, pageError?: string | null): Promise<void>;
+  showEventList(res: Response, store: AppSessionStore, category?: string, timeframe?: string, pageError?: string | null, isHtmx?: boolean): Promise<void>;
 }
 
 /**
@@ -53,16 +59,22 @@ class EventController implements IEventController {
   constructor(private readonly service: IEventService, private readonly logger: ILoggingService) {}
 
   private mapErrorStatus(error: Error): number {
-    // Map some common error names to HTTP statuses; adapt to your service errors if different.
-    const name = (error as any).name;
-    if (name === "AuthorizationRequired") return 403;
-    if (name === "EventNotFound") return 404;
-    if (name === "ValidationError" || name === "InvalidInput") return 400;
-    if (name === "InvalidStateTransition") return 409;
-    if (name === "ConflictError") return 409;
+    // Auth errors (mirrors AuthController pattern)
+    if (error.name === "AuthenticationRequired") return 401;
+    if (error.name === "AuthorizationRequired") return 403;
+    
+    // Event errors
+    if (error.name === "EventAuthorizationError") return 403;
+    if (error.name === "SearchValidationError") return 400;
+    if (error.name === "EventNotFound") return 404;
+    if (error.name === "EventAlreadyExists") return 409;
+    if (error.name === "EventValidationError") return 400;
+    if (error.name === "EventStateError") return 409;
+    if (error.name === "InvalidStateTransition") return 409;
+    
     return 500;
   }
-
+  
   // ── Helpers ────────────────────────────────────────────────────────
 
   /**
@@ -110,13 +122,14 @@ class EventController implements IEventController {
   }
 
   async showCreateEventForm(res: Response, session: IAppBrowserSession, pageError: string | null = null): Promise<void> {
+    // Always render the form partial (no layout)
     res.render("events/create", { session, pageError, event: null });
   }
 
   async createEventFromForm(res: Response, input: Partial<IEvent>, store: AppSessionStore): Promise<void> {
-    const session = touchAppSession(store);
     const currentUser = getAuthenticatedUser(store);
-    // Controller responsibility: Check for mandatory fields (non-empty)
+    
+    // Form validation only (required fields, basic format)
     const title = typeof input.title === "string" ? input.title.trim() : "";
     const description = typeof input.description === "string" ? input.description.trim() : "";
     const location = typeof input.location === "string" ? input.location.trim() : "";
@@ -125,46 +138,46 @@ class EventController implements IEventController {
     const endDateTimeRaw = typeof input.endDateTime === "string" ? input.endDateTime.trim() : "";
 
     if (!title) {
-      this.logger.warn("Create event failed: Title is required.");
+      const err = EventValidationError("Title is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
       res.status(400);
-      await this.showCreateEventForm(res, session, "Title is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!description) {
-      this.logger.warn("Create event failed: Description is required.");
+      const err = EventValidationError("Description is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
       res.status(400);
-      await this.showCreateEventForm(res, session, "Description is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!location) {
-      this.logger.warn("Create event failed: Location is required.");
+      const err = EventValidationError("Location is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
       res.status(400);
-      await this.showCreateEventForm(res, session, "Location is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!category) {
-      this.logger.warn("Create event failed: Category is required.");
+      const err = EventValidationError("Category is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
       res.status(400);
-      await this.showCreateEventForm(res, session, "Category is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!startDateTimeRaw) {
-      this.logger.warn("Create event failed: Start date/time is required.");
+      const err = EventValidationError("Start date/time is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
       res.status(400);
-      await this.showCreateEventForm(res, session, "Start date/time is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!endDateTimeRaw) {
-      this.logger.warn("Create event failed: End date/time is required.");
-      res.status(400);
-      await this.showCreateEventForm(res, session, "End date/time is required.");
-      return;
+      const err = EventValidationError("End date/time is required.");
+      this.logger.warn(`Create event failed: ${err.message}`);
+      res.status(400);  
+      return res.render("partials/error", { message: err.message, layout: false });
     }
-    // Parse dates for service 
+    
+    // Convert to ISO strings (format conversion, not business logic)
     const startDate = new Date(startDateTimeRaw);
     const endDate = new Date(endDateTimeRaw);
-    const createdAt = new Date();
-    // Handle capacity conversion (empty = undefined)
+    
     let capacity: number | undefined;
     if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
       capacity = typeof input.capacity === "number" 
@@ -182,24 +195,25 @@ class EventController implements IEventController {
       startDateTime: startDate.toISOString(),
       endDateTime: endDate.toISOString(),
       capacity,
-      createdAt: createdAt.toISOString(),
-      updatedAt: createdAt.toISOString(),
+      createdAt: new Date().toISOString(),
     };
 
     const result = await this.service.createEvent(eventForm);
-
     if (result.ok === false) {
       const err = result.value;
       const status = this.mapErrorStatus(err);
       const log = status >= 500 ? this.logger.error : this.logger.warn;
       log.call(this.logger, `Create event failed: ${err.message}`);
       res.status(status);
-      await this.showCreateEventForm(res, session, err.message);
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
 
     this.logger.info(`Event created ${result.value.id} by ${currentUser!.userId}`);
-    res.redirect("/home");
+    return res.render("partials/success", { 
+      message: "Event created successfully! Redirecting...",
+      redirectUrl: "/home",
+      layout: false,
+    });
   }
 
   async showEditEventForm(res: Response, eventId: string, session: IAppBrowserSession, pageError: string | null = null): Promise<void> {
@@ -216,64 +230,72 @@ class EventController implements IEventController {
   }
 
   async modifyEventFromForm(res: Response, eventId: string, input: Partial<IEvent>, store: AppSessionStore): Promise<void> {
-    const session = touchAppSession(store);
     const currentUser = getAuthenticatedUser(store);
-    // Controller responsibility: Check for eventId
+    
+    // Check for eventId
     if (!eventId) {
+      const err = EventValidationError("Missing event id.");
+      this.logger.warn(`Modify event failed: ${err.message}`);
       res.status(400);
-      await this.showEditEventForm(res, eventId, session, "Missing event id.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
 
-    // Controller responsibility: Check for mandatory fields (non-empty)
+    // Input validation only
     const title = typeof input.title === "string" ? input.title.trim() : "";
     const description = typeof input.description === "string" ? input.description.trim() : "";
     const location = typeof input.location === "string" ? input.location.trim() : "";
     const category = typeof input.category === "string" ? input.category.trim() : "";
     const startDateTimeRaw = typeof input.startDateTime === "string" ? input.startDateTime.trim() : "";
     const endDateTimeRaw = typeof input.endDateTime === "string" ? input.endDateTime.trim() : "";
+    const status = typeof input.status === "string" ? input.status.trim() : "";
 
     if (!title) {
-      this.logger.warn("Modify event failed: Title is required.");
+      const err = EventValidationError("Title is required.");
+      this.logger.warn(`Modify event failed: ${err.message}`);
       res.status(400);
-      await this.showEditEventForm(res, eventId, session, "Title is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!description) {
-      this.logger.warn("Modify event failed: Description is required.");
+      const err = EventValidationError("Description is required.");
+      this.logger.warn(`Modify event failed: ${err.message}`);
       res.status(400);
-      await this.showEditEventForm(res, eventId, session, "Description is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!location) {
-      this.logger.warn("Modify event failed: Location is required.");
+      const err = EventValidationError("Location is required.");
+      this.logger.warn(`Modify event failed: ${err.message}`);
       res.status(400);
-      await this.showEditEventForm(res, eventId, session, "Location is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!category) {
-      this.logger.warn("Modify event failed: Category is required.");
+      const err = EventValidationError("Category is required.");
+      this.logger.warn(`Modify event failed: ${err.message}`);
       res.status(400);
-      await this.showEditEventForm(res, eventId, session, "Category is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!startDateTimeRaw) {
-      this.logger.warn("Modify event failed: Start date/time is required.");
+      const err = EventValidationError("Start date/time is required.");
+      this.logger.warn(`Modify event failed: ${err.message}`);
       res.status(400);
-      await this.showEditEventForm(res, eventId, session, "Start date/time is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
     if (!endDateTimeRaw) {
-      this.logger.warn("Modify event failed: End date/time is required.");
+      const err = EventValidationError("End date/time is required.");
+      this.logger.warn(`Modify event failed: ${err.message}`);
       res.status(400);
-      await this.showEditEventForm(res, eventId, session, "End date/time is required.");
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
+    }
+    if (!status) {
+      const err = EventValidationError("Status is required.");
+      this.logger.warn(`Modify event failed: ${err.message}`);
+      res.status(400);
+      return res.render("partials/error", { message: err.message, layout: false });
     }
 
-    // Parse dates for service 
+    // Convert to ISO strings (format conversion)
     const startDate = new Date(startDateTimeRaw);
     const endDate = new Date(endDateTimeRaw);
-
+    
     // Handle capacity conversion (empty = undefined)
     let capacity: number | undefined;
     if (input.capacity !== undefined && String(input.capacity).trim() !== "") {
@@ -282,7 +304,16 @@ class EventController implements IEventController {
         : parseInt(String(input.capacity), 10);
     }
 
-    // Build patch with raw data - service will validate everything
+    // Check that status is of StatusType
+    const validStatuses: statusType[] = ["draft", "published", "cancelled", "past"];
+    if (!validStatuses.includes(status as statusType)) {
+      const err = EventValidationError(`Invalid status. Status must be one of: ${validStatuses.join(", ")}`);
+      this.logger.warn(`Modify event failed: ${err.message}`);
+      res.status(400);
+      return res.render("partials/error", { message: err.message, layout: false });
+    }
+
+    // Build patch with formatted data
     const patch: Partial<IEvent> = {
       title,
       description,
@@ -291,13 +322,9 @@ class EventController implements IEventController {
       startDateTime: startDate.toISOString(),
       endDateTime: endDate.toISOString(),
       capacity,
+      status: status as statusType,
       updatedAt: new Date().toISOString(),
     };
-
-    // Include status if provided (service will validate)
-    if (input.status !== undefined) {
-      patch.status = input.status;
-    }
 
     const result = await this.service.modifyEvent(eventId, patch);
 
@@ -307,43 +334,69 @@ class EventController implements IEventController {
       const log = status >= 500 ? this.logger.error : this.logger.warn;
       log.call(this.logger, `Modify event failed: ${err.message}`);
       res.status(status);
-      await this.showEditEventForm(res, eventId, session, err.message);
-      return;
+      return res.render("partials/error", { message: err.message, layout: false });
     }
 
     this.logger.info(`Event ${eventId} modified by ${currentUser!.userId}`);
-    res.redirect("/home");
+    return res.render("partials/success", { 
+      message: "Event modified successfully! Redirecting...",
+      redirectUrl: "/home",
+      layout: false,
+    });
   }
-    async showSearchPage(
-    res: Response,
-    session: IAppBrowserSession,
-    query: string,
-    pageError: string | null = null,
-  ): Promise<void> {
-    const result = await this.service.searchEvents(query);
 
-    if (result.ok === false) {
-      const err = result.value;
-      const status = this.mapErrorStatus(err);
-      this.logger.warn(`Search events failed: ${err.message}`);
-      res.status(status).render("events/search", {
-        session,
-        pageError: err.message,
+  async showSearchPage(
+  res: Response,
+  session: IAppBrowserSession,
+  query: string,
+  pageError: string | null = null,
+  isHtmx: boolean = false,
+): Promise<void> {
+  const result = await this.service.searchEvents(query);
+
+  if (result.ok === false) {
+    const err = result.value;
+    const status = this.mapErrorStatus(err);
+    this.logger.warn(`Search events failed: ${err.message}`);
+
+    if (isHtmx) {
+      res.status(status).render("events/partials/search-results", {
         query,
+        pageError: err.message,
         events: [],
+        layout: false,
       });
       return;
     }
 
-    res.render("events/search", {
+    res.status(status).render("events/search", {
       session,
-      pageError,
+      pageError: err.message,
       query,
-      events: result.value,
+      events: [],
     });
+    return;
   }
 
-  // ── Lifecycle transitions (Feature 5, Sprint 1) ───────────────────
+  if (isHtmx) {
+    res.render("events/partials/search-results", {
+      query,
+      pageError: null,
+      events: result.value,
+      layout: false,
+    });
+    return;
+  }
+
+  res.render("events/search", {
+    session,
+    pageError,
+    query,
+    events: result.value,
+  });
+}
+
+  // ── Lifecycle transitions (Feature 5) ───────────────────
 
   async publishEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void> {
     const session = touchAppSession(store);
@@ -360,14 +413,33 @@ class EventController implements IEventController {
 
     if (result.ok === false) {
       const err = result.value;
-      const httpStatus = this.mapErrorStatus(err);
       this.logger.warn(`Publish event ${eventId} failed: ${err.message}`);
-      res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+
+      // Re-fetch event so we can render inline controls with the error
+      const eventResult = await this.service.getEvent(eventId);
+      if (eventResult.ok) {
+        res.render("events/partials/event-status-controls", {
+          event: eventResult.value,
+          session,
+          actionError: err.message,
+          actionSuccess: null,
+          layout: false,
+        });
+      } else {
+        const httpStatus = this.mapErrorStatus(err);
+        res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+      }
       return;
     }
 
     this.logger.info(`Event ${eventId} published by ${currentUser.userId}`);
-    res.redirect("/home");
+    res.render("events/partials/event-status-controls", {
+      event: result.value,
+      session,
+      actionError: null,
+      actionSuccess: "Event published successfully!",
+      layout: false,
+    });
   }
 
   async cancelEvent(res: Response, eventId: string, store: AppSessionStore): Promise<void> {
@@ -385,17 +457,36 @@ class EventController implements IEventController {
 
     if (result.ok === false) {
       const err = result.value;
-      const httpStatus = this.mapErrorStatus(err);
       this.logger.warn(`Cancel event ${eventId} failed: ${err.message}`);
-      res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+
+      // Re-fetch event so we can render inline controls with the error
+      const eventResult = await this.service.getEvent(eventId);
+      if (eventResult.ok) {
+        res.render("events/partials/event-status-controls", {
+          event: eventResult.value,
+          session,
+          actionError: err.message,
+          actionSuccess: null,
+          layout: false,
+        });
+      } else {
+        const httpStatus = this.mapErrorStatus(err);
+        res.status(httpStatus).render("partials/error", { message: err.message, layout: false });
+      }
       return;
     }
 
     this.logger.info(`Event ${eventId} cancelled by ${currentUser.userId}`);
-    res.redirect("/home");
+    res.render("events/partials/event-status-controls", {
+      event: result.value,
+      session,
+      actionError: null,
+      actionSuccess: "Event cancelled.",
+      layout: false,
+    });
   }
 
- async showOrganizerDashboard(res: Response, store: AppSessionStore): Promise<void> {
+  async showOrganizerDashboard(res: Response, store: AppSessionStore): Promise<void> {
     const session = touchAppSession(store);
     const currentUser = getAuthenticatedUser(store);
 
@@ -489,28 +580,30 @@ class EventController implements IEventController {
     category?: string,
     timeframe?: string,
     pageError: string | null = null,
+    isHtmx: boolean = false,
   ): Promise<void> {
     const session = touchAppSession(store);
 
     const result = await this.service.filterEvents({ category, timeframe });
 
-    if (result.ok === false) {
-      const err = result.value;
-      this.logger.warn(`showEventList: ${err.message}`);
-      res.render("events/list", {
-        session,
-        pageError: err.message,
-        events: [],
-        filters: { category: category ?? "", timeframe: timeframe ?? "" },
+    const events = result.ok ? result.value : [];
+    const error = result.ok ? null : (result.value as Error).message;
+    const filterState = { category: category ?? "", timeframe: timeframe ?? "" };
+
+    if (isHtmx) {
+      res.render("events/partials/event-list", {
+        events,
+        pageError: error,
+        layout: false,
       });
       return;
     }
 
     res.render("events/list", {
       session,
-      pageError,
-      events: result.value,
-      filters: { category: category ?? "", timeframe: timeframe ?? "" },
+      pageError: error,
+      events,
+      filters: filterState,
     });
   }
 }
