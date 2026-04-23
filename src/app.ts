@@ -320,7 +320,13 @@ class ExpressApp implements IApp {
         const browserSession = recordPageView(store);
         this.logger.info(`GET /events/search?q=${query}`);
 
-        await this.eventController.showSearchPage(res, browserSession, query);
+        await this.eventController.showSearchPage(
+          res,
+          browserSession,
+          query,
+          null,
+          req.get("HX-Request") === "true",
+);
       }),
     );
     
