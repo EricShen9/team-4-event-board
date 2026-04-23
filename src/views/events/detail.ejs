@@ -22,13 +22,16 @@
     <p class="text-slate-600"><%= event.description %></p>
   </div>
 
-  <% if (event.status === "published") { %>
-    <div class="border-t border-slate-200 pt-4 mt-4">
-      <form method="post" action="/events/<%= event.id %>/rsvp">
-        <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white">
-          Toggle RSVP
-        </button>
-      </form>
+    <% if (event.status === "published") { %>
+    <div
+      id="rsvp-controls-<%= event.id %>"
+      hx-get="/events/<%= event.id %>/rsvp-controls"
+      hx-trigger="load"
+      hx-swap="outerHTML"
+    >
+      <div class="border-t border-slate-200 pt-4 mt-4">
+        <p class="text-sm text-slate-500 mb-0">Loading RSVP controls...</p>
+      </div>
     </div>
   <% } %>
 </section>
