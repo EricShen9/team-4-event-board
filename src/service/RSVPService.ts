@@ -1,10 +1,13 @@
 import { Result, Ok, Err } from "../lib/result";
 import type { ILoggingService } from "./LoggingService";
-import type { IRSVP, IEvent, IEventRepository, RSVPStatusType } from "../repository/EventRepository";
+import type { IRSVP, IEvent, IEventRepository } from "../repository/EventRepository";
 import type { IRSVPRepository } from "../repository/RSVPRepository";
 import type { UserRole } from "../auth/User";
-
-
+import {
+  RSVPAuthorizationError,
+  RSVPNotFound,
+  RSVPStateError,
+} from "../lib/error";
 export interface IMyRSVPDashboard {
   upcoming: Array<{ event: IEvent; rsvp: IRSVP }>;
   past: Array<{ event: IEvent; rsvp: IRSVP }>;
@@ -54,7 +57,7 @@ class RSVPService implements IRSVPService {
     private readonly logger: ILoggingService,
   ) {}
 
-  async cancelRSVPWithPromotion(
+    async cancelRSVPWithPromotion(
     eventId: string,
     userId: string,
   ): Promise<Result<{ cancelled: IRSVP; promoted?: IRSVP }, Error>> {
@@ -72,14 +75,14 @@ class RSVPService implements IRSVPService {
       this.logger.warn(
         `cancelRSVPWithPromotion: RSVP not found for user ${userId} on event ${eventId}.`,
       );
-      return Err(new Error("RSVP not found."));
+      return Err(RSVPNotFound("RSVP not found."));
     }
 
     if (existing.status === "cancelled") {
       this.logger.warn(
         `cancelRSVPWithPromotion: RSVP already cancelled for user ${userId} on event ${eventId}.`,
       );
-      return Err(new Error("RSVP is already cancelled."));
+      return Err(RSVPStateError("RSVP is already cancelled."));
     }
 
     const cancelledResult = await this.rsvpRepository.updateRSVPStatus(
@@ -93,7 +96,7 @@ class RSVPService implements IRSVPService {
 
     const cancelled = cancelledResult.value;
 
-    if (existing.status !== ("going")) {
+    if (existing.status !== "going") {
       return Ok({ cancelled });
     }
 
@@ -104,10 +107,7 @@ class RSVPService implements IRSVPService {
     }
 
     const nextWaitlisted = eventRSVPsResult.value
-      .filter(
-        (rsvp) =>
-          rsvp.status === ("waitlisted"),
-      )
+      .filter((rsvp) => rsvp.status === "waitlisted")
       .sort(
         (a, b) =>
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -168,66 +168,13 @@ class RSVPService implements IRSVPService {
     return Ok(index + 1);
   }
 
-    async getRSVPDetailState(
-    eventId: string,
-    userId: string,
-    role: UserRole,
-  ): Promise<Result<IRSVPDetailState, Error>> {
-    const eventResult = await this.eventRepository.getEvent(eventId);
-    if (eventResult.ok === false) {
-      return Err(eventResult.value);
-    }
-
-    const event = eventResult.value;
-
-    const currentRSVPResult = await this.rsvpRepository.getRSVPByUserAndEvent(
-      userId,
-      eventId,
-    );
-    if (currentRSVPResult.ok === false) {
-      return Err(currentRSVPResult.value);
-    }
-
-    const allRSVPsResult = await this.rsvpRepository.getRSVPsByEvent(eventId);
-    if (allRSVPsResult.ok === false) {
-      return Err(allRSVPsResult.value);
-    }
-
-    const attendeeCount = allRSVPsResult.value.filter(
-      (rsvp) => rsvp.status === "going",
-    ).length;
-
-    let waitlistPosition: number | null = null;
-    if (currentRSVPResult.value?.status === "waitlisted") {
-      const waitlistResult = await this.getWaitlistPosition(eventId, userId);
-      if (waitlistResult.ok === false) {
-        return Err(waitlistResult.value);
-      }
-      waitlistPosition = waitlistResult.value;
-    }
-
-    const eventEnded = new Date(event.endDateTime) < new Date();
-    const canInteract =
-      role === "user" &&
-      event.status === "published" &&
-      !eventEnded;
-
-    return Ok({
-      event,
-      currentRSVP: currentRSVPResult.value,
-      attendeeCount,
-      waitlistPosition,
-      canInteract,
-    });
-  }
-
-  async toggleRSVP(
+    async toggleRSVP(
     eventId: string,
     userId: string,
     role: UserRole,
   ): Promise<Result<IRSVP, Error>> {
     if (role !== "user") {
-      return Err(new Error("Only members can RSVP."));
+      return Err(RSVPAuthorizationError("Only members can RSVP."));
     }
 
     const eventResult = await this.eventRepository.getEvent(eventId);
@@ -239,15 +186,15 @@ class RSVPService implements IRSVPService {
     const eventEnded = new Date(event.endDateTime) < new Date();
 
     if (event.status === "cancelled") {
-      return Err(new Error("You cannot RSVP to a cancelled event."));
+      return Err(RSVPStateError("You cannot RSVP to a cancelled event."));
     }
 
     if (event.status === "past" || eventEnded) {
-      return Err(new Error("You cannot RSVP to a past event."));
+      return Err(RSVPStateError("You cannot RSVP to a past event."));
     }
 
     if (event.status !== "published") {
-      return Err(new Error("You can only RSVP to published events."));
+      return Err(RSVPStateError("You can only RSVP to published events."));
     }
 
     const existingResult = await this.rsvpRepository.getRSVPByUserAndEvent(

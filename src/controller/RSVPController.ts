@@ -32,6 +32,12 @@ class RSVPController implements IRSVPController {
     private readonly rsvpService: IRSVPService,
     private readonly logger: ILoggingService,
   ) {}
+  private mapToggleErrorStatus(error: Error): number {
+    if (error.name === "RSVPAuthorizationError") return 403;
+    if (error.name === "RSVPNotFound") return 404;
+    if (error.name === "RSVPStateError") return 409;
+    return 400;
+  }
 
   private async renderDetailRSVPControls(
     res: Response,
@@ -111,25 +117,26 @@ class RSVPController implements IRSVPController {
     const fromDashboard = referer.includes("/my-rsvps");
 
     if (result.ok === false) {
-      this.logger.warn(`RSVP toggle failed: ${result.value.message}`);
+  const status = this.mapToggleErrorStatus(result.value);
+  this.logger.warn(`RSVP toggle failed: ${result.value.message}`);
 
-      if (isHtmxRequest && fromDetailPage) {
-        await this.renderDetailRSVPControls(
-          res,
-          eventId,
-          store,
-          result.value.message,
-          null,
-        );
-        return;
-      }
+  if (isHtmxRequest && fromDetailPage) {
+    await this.renderDetailRSVPControls(
+      res,
+      eventId,
+      store,
+      result.value.message,
+      null,
+    );
+    return;
+  }
 
-      res.status(400).render("partials/error", {
-        message: result.value.message,
-        layout: false,
-      });
-      return;
-    }
+  res.status(status).render("partials/error", {
+    message: result.value.message,
+    layout: false,
+  });
+  return;
+}
 
     if (isHtmxRequest && fromDashboard) {
       const dashboardResult = await this.rsvpService.getMyRSVPDashboard(
