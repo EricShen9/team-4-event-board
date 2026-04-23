@@ -1,0 +1,49 @@
+<div id="search-results" class="max-w-4xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
+  <div class="mb-4">
+    <h2 class="text-xl font-semibold mb-2">Results</h2>
+    <p class="text-slate-500">
+      <% if (query && query.trim()) { %>
+        Showing results for "<strong><%= query %></strong>"
+      <% } else { %>
+        Showing all published upcoming events.
+      <% } %>
+    </p>
+  </div>
+
+  <% if (pageError) { %>
+    <div class="mb-4 p-4 rounded-xl border border-red-200 bg-red-50 text-red-800" aria-live="polite">
+      <h3 class="text-base font-semibold mb-1">Error</h3>
+      <p class="mb-0 text-sm"><%= pageError %></p>
+    </div>
+  <% } %>
+
+  <% if (!events || events.length === 0) { %>
+    <p class="text-slate-500 mb-0">No matching events found.</p>
+  <% } else { %>
+    <ul class="list-none m-0 p-0 grid gap-4">
+      <% events.forEach((event) => { %>
+        <li class="p-4 border border-slate-200 rounded-xl bg-slate-50">
+          <h3 class="text-lg font-semibold text-slate-900 mb-1"><%= event.title %></h3>
+          <p class="text-sm text-slate-500 mb-2"><%= event.description %></p>
+
+          <p class="text-sm text-slate-600 mb-0">
+            <strong>Location:</strong> <%= event.location %>
+          </p>
+          <p class="text-sm text-slate-600 mb-0">
+            <strong>Category:</strong> <%= event.category %>
+          </p>
+          <p class="text-sm text-slate-600 mb-3">
+            <strong>Start:</strong> <%= new Date(event.startDateTime).toLocaleString() %>
+          </p>
+
+          <a
+            href="/events/<%= event.id %>"
+            class="inline-block px-3 py-2 rounded-lg bg-white border border-slate-300 text-slate-800 no-underline hover:bg-slate-100 text-sm font-medium"
+          >
+            View Event
+          </a>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+</div>

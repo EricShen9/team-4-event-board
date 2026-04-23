@@ -327,6 +327,8 @@ class ExpressApp implements IApp {
         null,
         req.get("HX-Request") === "true",
       );
+       
+
       }),
     );
     
