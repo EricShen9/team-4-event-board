@@ -1,4 +1,4 @@
-<section class="glass-panel">
+<section id="my-rsvps-dashboard" class="glass-panel">
   <h1>My RSVPs</h1>
 
   <h2>Upcoming</h2>
@@ -12,7 +12,15 @@
       <p><strong>RSVP status:</strong> <%= rsvp.status %></p>
       <p><strong>Category:</strong> <%= event.category %></p>
       <p><strong>Location:</strong> <%= event.location %></p>
-      <p><strong>Starts:</strong> <%= event.startDateTime %></p>
+      <p><strong>Starts:</strong> <%= new Date(event.startDateTime).toLocaleString() %></p>
+
+      <form
+        hx-post="/events/<%= event.id %>/rsvp"
+        hx-target="#my-rsvps-dashboard"
+        hx-swap="outerHTML"
+      >
+        <button type="submit">Cancel RSVP</button>
+      </form>
     </div>
   <% }) %>
 
@@ -28,7 +36,7 @@
       <p><strong>Event status:</strong> <%= event.status %></p>
       <p><strong>Category:</strong> <%= event.category %></p>
       <p><strong>Location:</strong> <%= event.location %></p>
-      <p><strong>Starts:</strong> <%= event.startDateTime %></p>
+      <p><strong>Starts:</strong> <%= new Date(event.startDateTime).toLocaleString() %></p>
     </div>
   <% }) %>
 </section>
