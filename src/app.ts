@@ -256,6 +256,7 @@ class ExpressApp implements IApp {
     const store = sessionStore(req);
 
     await this.rsvpController.toggleRSVPFromRequest(
+      req,
       res,
       eventId,
       store,
