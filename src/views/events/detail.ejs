@@ -21,6 +21,16 @@
     <h2 class="text-lg font-semibold text-slate-800 mb-2">Description</h2>
     <p class="text-slate-600"><%= event.description %></p>
   </div>
+
+  <% if (event.status === "published") { %>
+    <div class="border-t border-slate-200 pt-4 mt-4">
+      <form method="post" action="/events/<%= event.id %>/rsvp">
+        <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white">
+          Toggle RSVP
+        </button>
+      </form>
+    </div>
+  <% } %>
 </section>
 
 <% if (pageError) { %>
