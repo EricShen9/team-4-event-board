@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import {
   getAuthenticatedUser,
   touchAppSession,
@@ -13,6 +13,7 @@ export interface IRSVPController {
     store: AppSessionStore,
   ): Promise<void>;
   toggleRSVPFromRequest(
+    req: Request,
     res: Response,
     eventId: string,
     store: AppSessionStore,
@@ -26,6 +27,7 @@ class RSVPController implements IRSVPController {
   ) {}
 
   async toggleRSVPFromRequest(
+    req: Request,
     res: Response,
     eventId: string,
     store: AppSessionStore,
@@ -55,11 +57,10 @@ class RSVPController implements IRSVPController {
       return;
     }
 
-    const isHtmxRequest = res.req?.get("HX-Request") === "true";
-    const referer = res.req?.get("Referer") ?? "";
+    const isHtmxRequest = req.get("HX-Request") === "true";
+    const referer = req.get("Referer") ?? "";
 
     if (isHtmxRequest && referer.includes("/my-rsvps")) {
-      const session = touchAppSession(store);
       const dashboardResult = await this.rsvpService.getMyRSVPDashboard(
         currentUser.userId,
         currentUser.role,
@@ -76,8 +77,10 @@ class RSVPController implements IRSVPController {
         return;
       }
 
-      res.status(200).render("rsvps/dashboard", {
-        session,
+      const cancelledRsvpId = result.value.id;
+
+      res.status(200).render("rsvps/dashboard-cancel-response", {
+        cancelledRsvpId,
         dashboard: dashboardResult.value,
         layout: false,
       });
