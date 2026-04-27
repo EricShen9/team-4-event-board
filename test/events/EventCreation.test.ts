@@ -4,6 +4,8 @@ import request from "supertest";
 import type { Express } from "express";
 import { createComposedApp } from "../../src/composition";
 
+process.env.DATABASE_URL = "file:./prisma/test.db";
+
 describe("POST /events — event creation", () => {
   let app: Express;
 
