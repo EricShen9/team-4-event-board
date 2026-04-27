@@ -6,23 +6,20 @@ datasource db {
   provider = "sqlite"
 }
 
-// TODO: Define your project's data models here.
-// Example:
-//
 model Event {
-  id            String   @id @default(cuid())
+  id            Int      @id @default(autoincrement())
   organizerId   String
   title         String
   description   String
   location      String
   category      String
-  status        String   // "published", "draft", "cancelled", "past"
-  startDateTime DateTime
-  endDateTime   DateTime
+  status        String
+  startDateTime String
+  endDateTime   String
   capacity      Int?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  createdAt     String
+  updatedAt     String?
+
   @@index([organizerId])
   @@index([status])
   @@index([startDateTime])
