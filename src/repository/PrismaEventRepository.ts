@@ -3,7 +3,7 @@ import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { Result, Ok, Err } from "../lib/result";
 import type { IEvent, IEventRepository } from "./EventRepository";
 import type { ILoggingService } from "../service/LoggingService";
-import { EventAlreadyExists } from "../lib/error";
+import { EventAlreadyExists, EventNotFound, EventIdMismatch } from "../lib/error";
 import { statusType } from "./EventRepository";
 
 const globalForPrisma = globalThis as unknown as {
@@ -64,7 +64,7 @@ class PrismaEventRepository implements IEventRepository {
       return Ok(resultEvent);
     } catch (error) {
       if ((error as any).code === "P2002") {
-        this.logger.warn(`addEvent: event already exists.`);
+        this.logger.warn(`addEvent: event with id already exists.`);
         return Err(EventAlreadyExists(`Event already exists.`));
       }
       this.logger.error(`addEvent failed: ${error}`);
@@ -76,18 +76,95 @@ class PrismaEventRepository implements IEventRepository {
     eventId: string,
     patch: Partial<IEvent>,
   ): Promise<Result<IEvent, Error>> {
-    throw new Error("editEvent not implemented");
+    try {
+      const numericId = parseInt(eventId, 10);
+      
+      // Check if event exists
+      const existing = await this.prisma.event.findUnique({
+        where: { id: numericId }
+      });
+
+      if (!existing) {
+        this.logger.warn(`editEvent: event with id ${eventId} not found.`);
+        return Err(EventNotFound(`Event with id ${eventId} not found.`));
+      }
+
+      // Check for event ID mismatch
+      if (patch.id && patch.id !== eventId) {
+        this.logger.warn(`editEvent: event id mismatch (${patch.id} vs ${eventId}).`);
+        return Err(EventIdMismatch("Event ID mismatch."));
+      }
+
+      // Simple update - just replace the event
+      const updatedEvent = await this.prisma.event.update({
+        where: { id: numericId },
+        data: {
+          organizerId: patch.organizerId!,
+          title: patch.title!,
+          description: patch.description!,
+          location: patch.location!,
+          category: patch.category!,
+          status: patch.status!,
+          startDateTime: patch.startDateTime!,
+          endDateTime: patch.endDateTime!,
+          capacity: patch.capacity,
+          createdAt: patch.createdAt!,
+          updatedAt: patch.updatedAt,
+        },
+      });
+
+      const resultEvent: IEvent = {
+        ...updatedEvent,
+        id: updatedEvent.id.toString(),
+        status: updatedEvent.status as statusType,
+        capacity: updatedEvent.capacity ?? undefined,
+        updatedAt: updatedEvent.updatedAt ?? undefined,
+      };
+
+      this.logger.info(`editEvent: updated event ${eventId} ("${resultEvent.title}").`);
+      return Ok(resultEvent);
+    } catch (error) {
+      this.logger.error(`editEvent failed for ${eventId}: ${error}`);
+      return Err(new Error(`Failed to update event: ${error}`));
+    }
   }
 
   async getEvent(eventId: string): Promise<Result<IEvent, Error>> {
-    throw new Error("getEvent not implemented");
+    try {
+      const numericId = parseInt(eventId, 10);
+      
+      const event = await this.prisma.event.findUnique({
+        where: { id: numericId }
+      });
+
+      if (!event) {
+        this.logger.warn(`getEvent: event with id ${eventId} not found.`);
+        return Err(EventNotFound(`Event with id ${eventId} not found.`));
+      }
+
+      const resultEvent: IEvent = {
+        ...event,
+        id: event.id.toString(),
+        status: event.status as statusType,
+        capacity: event.capacity ?? undefined,
+        updatedAt: event.updatedAt ?? undefined,
+      };
+
+      this.logger.info(`getEvent: retrieved event ${eventId}.`);
+      return Ok(resultEvent);
+    } catch (error) {
+      this.logger.error(`getEvent failed for ${eventId}: ${error}`);
+      return Err(new Error(`Failed to retrieve event: ${error}`));
+    }
   }
 
   async searchEvents(term: string): Promise<Result<IEvent[], Error>> {
+    // Stub - not implemented yet
     throw new Error("searchEvents not implemented");
   }
 
   async getAllEvents(): Promise<Result<IEvent[], Error>> {
+    // Stub - not implemented yet
     throw new Error("getAllEvents not implemented");
   }
 }
