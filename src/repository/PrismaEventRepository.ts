@@ -166,9 +166,17 @@ class PrismaEventRepository implements IEventRepository {
   async getAllEvents(): Promise<Result<IEvent[], Error>> {
     try {
       const events = await this.prisma.event.findMany();
-      this.logger.info(`getAllEvents: returning ${events.length} event(s).`);
-      return Ok(events as any);
 
+      const resultEvents: IEvent[] = events.map((event: any) => ({
+        ...event,
+        id: event.id.toString(),
+        status: event.status as statusType,
+        capacity: event.capacity ?? undefined,
+        updatedAt: event.updatedAt ?? undefined,
+      }));
+
+      this.logger.info(`getAllEvents: returning ${resultEvents.length} event(s).`);
+      return Ok(resultEvents);
     } catch (error) {
       this.logger.error(`getAllEvents failed: ${error}`);
       return Err(new Error(`Failed to retrieve events: ${error}`));
