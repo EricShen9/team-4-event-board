@@ -8,6 +8,7 @@
     "build": "tsc --outDir dist -m nodenext -t es2024 --esModuleInterop src/app.ts src/server.ts",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
+    "test:setup": "prisma db push --force-reset",   
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "clean": "rimraf dist node_modules"
