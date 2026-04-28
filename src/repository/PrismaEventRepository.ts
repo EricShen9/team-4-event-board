@@ -164,8 +164,15 @@ class PrismaEventRepository implements IEventRepository {
   }
 
   async getAllEvents(): Promise<Result<IEvent[], Error>> {
-    // Stub - not implemented yet
-    throw new Error("getAllEvents not implemented");
+    try {
+      const events = await this.prisma.event.findMany();
+      this.logger.info(`getAllEvents: returning ${events.length} event(s).`);
+      return Ok(events as any);
+
+    } catch (error) {
+      this.logger.error(`getAllEvents failed: ${error}`);
+      return Err(new Error(`Failed to retrieve events: ${error}`));
+    }
   }
 }
 
