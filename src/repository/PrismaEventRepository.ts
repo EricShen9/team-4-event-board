@@ -158,9 +158,50 @@ class PrismaEventRepository implements IEventRepository {
     }
   }
 
-  async searchEvents(term: string): Promise<Result<IEvent[], Error>> {
-    // Stub - not implemented yet
-    throw new Error("searchEvents not implemented");
+    async searchEvents(term: string): Promise<Result<IEvent[], Error>> {
+    try {
+      const normalizedTerm = term.trim().toLowerCase();
+      const now = new Date().toISOString();
+
+      const events = await this.prisma.event.findMany({
+        where: {
+          status: "published",
+          startDateTime: {
+            gt: now,
+          },
+        },
+        orderBy: {
+          startDateTime: "asc",
+        },
+      });
+
+      const resultEvents: IEvent[] = events.map((event) => ({
+        ...event,
+        id: event.id.toString(),
+        status: event.status as statusType,
+        capacity: event.capacity ?? undefined,
+        updatedAt: event.updatedAt ?? undefined,
+      }));
+
+      const matches =
+        normalizedTerm.length === 0
+          ? resultEvents
+          : resultEvents.filter((event) => {
+              return (
+                event.title.toLowerCase().includes(normalizedTerm) ||
+                event.description.toLowerCase().includes(normalizedTerm) ||
+                event.location.toLowerCase().includes(normalizedTerm)
+              );
+            });
+
+      this.logger.info(
+        `searchEvents: found ${matches.length} matching published upcoming event(s).`,
+      );
+      return Ok(matches);
+    } catch (error) {
+      this.logger.error(`searchEvents failed: ${error}`);
+      return Err(new Error(`Failed to search events: ${error}`));
+    }
   }
 
   async getAllEvents(): Promise<Result<IEvent[], Error>> {
