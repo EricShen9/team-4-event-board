@@ -1,14 +1,24 @@
-// test/events/EventDetail.test.ts
-
 import request from "supertest";
 import type { Express } from "express";
 import { createComposedApp } from "../../src/composition";
+import { PrismaClient } from "@prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+
+process.env.DATABASE_URL = "file:./prisma/test.db";
+
+const testAdapter = new PrismaBetterSqlite3({ url: "file:./prisma/test.db" });
+const testPrisma = new PrismaClient({ adapter: testAdapter });
 
 describe("GET /events/:id — event detail page", () => {
   let app: Express;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    await testPrisma.event.deleteMany();
     app = createComposedApp().getExpressApp();
+  });
+
+  afterAll(async () => {
+    await testPrisma.$disconnect();
   });
 
   // ── Helpers ────────────────────────────────────────────────────────
@@ -61,7 +71,7 @@ describe("GET /events/:id — event detail page", () => {
     });
   });
 
-  // ── Published event  ──────────────────────────────────
+  // ── Published event ───────────────────────────────────────────────
 
   describe("published event", () => {
     it("returns 200 and shows event details for a published event", async () => {
@@ -130,7 +140,6 @@ describe("GET /events/:id — event detail page", () => {
     });
 
     it("different staff member cannot see another staff's draft", async () => {
-      // Staff creates a draft, but since there's only one staff account in demo, we test with user role instead, which should also be blocked
       const staffAgent = await loginAs("staff@app.test", "password123");
       const eventId = await createDraftEvent(staffAgent, { title: "Private Staff Draft" });
 
@@ -144,10 +153,9 @@ describe("GET /events/:id — event detail page", () => {
   // ── Edge case ─────────────────────────────────────────────────────
 
   describe("edge cases", () => {
-    it("returns 404 for an empty event ID", async () => {
+    it("returns 200 for empty event ID (hits list route)", async () => {
       const agent = await loginAs("user@app.test", "password123");
       const res = await agent.get("/events/");
-      // --> /events (the list route) not /events/:id
       expect(res.status).toBe(200);
     });
   });
