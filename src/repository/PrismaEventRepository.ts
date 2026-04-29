@@ -167,7 +167,7 @@ class PrismaEventRepository implements IEventRepository {
     try {
       const events = await this.prisma.event.findMany();
 
-      const resultEvents: IEvent[] = events.map((event) => ({
+      const resultEvents: IEvent[] = events.map((event: any) => ({
         ...event,
         id: event.id.toString(),
         status: event.status as statusType,
