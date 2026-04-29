@@ -14,6 +14,7 @@ describe("GET /events/:id — event detail page", () => {
 
   beforeAll(async () => {
     await testPrisma.event.deleteMany();
+    await testPrisma.$executeRawUnsafe("DELETE FROM sqlite_sequence WHERE name='Event'");
     app = createComposedApp().getExpressApp();
   });
 

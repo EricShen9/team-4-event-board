@@ -1,16 +1,29 @@
-
 import request from "supertest";
 import type { Express } from "express";
 import { createComposedApp } from "../../src/composition";
+import { PrismaClient } from "@prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+
+
+process.env.DATABASE_URL = "file:./prisma/test.db";
+
+const testAdapter = new PrismaBetterSqlite3({ url: "file:./prisma/test.db" });
+const testPrisma = new PrismaClient({ adapter: testAdapter });
 
 describe("GET /events — event list and filter", () => {
   let app: Express;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    await testPrisma.event.deleteMany();
+    await testPrisma.$executeRawUnsafe("DELETE FROM sqlite_sequence WHERE name='Event'");
     app = createComposedApp().getExpressApp();
   });
 
-    // ── Helpers ────────────────────────────────────────────────────────
+  afterAll(async () => {
+    await testPrisma.$disconnect();
+  });
+
+  // ── Helpers ────────────────────────────────────────────────────────
 
   async function loginAs(email: string, password: string) {
     const agent = request.agent(app);
