@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { Result, Ok, Err } from "../lib/result";
-import type { IRSVP } from "./EventRepository";
+import type { IEvent, IRSVP, statusType } from "./EventRepository";
 import type { IRSVPRepository } from "./RSVPRepository";
 import type { ILoggingService } from "../service/LoggingService";
 import {
@@ -51,6 +51,36 @@ class PrismaRSVPRepository implements IRSVPRepository {
     };
   }
 
+  private toEvent(record: {
+    id: number;
+    organizerId: string;
+    title: string;
+    description: string;
+    location: string;
+    category: string;
+    status: string;
+    startDateTime: string;
+    endDateTime: string;
+    capacity: number | null;
+    createdAt: string;
+    updatedAt: string | null;
+  }): IEvent {
+    return {
+      id: record.id.toString(),
+      organizerId: record.organizerId,
+      title: record.title,
+      description: record.description,
+      location: record.location,
+      category: record.category,
+      status: record.status as statusType,
+      startDateTime: record.startDateTime,
+      endDateTime: record.endDateTime,
+      capacity: record.capacity ?? undefined,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt ?? undefined,
+    };
+  }
+
   private parseEventId(eventId: string): Result<number, Error> {
     const numericEventId = Number.parseInt(eventId, 10);
 
@@ -69,7 +99,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
         return Err(eventIdResult.value);
       }
 
-      const created = await this.prisma.rSVP.create({
+      const created = await this.prisma.rsvp.create({
         data: {
           id: rsvp.id,
           eventId: eventIdResult.value,
@@ -99,9 +129,9 @@ class PrismaRSVPRepository implements IRSVPRepository {
         return Err(eventIdResult.value);
       }
 
-      const rsvp = await this.prisma.rSVP.findUnique({
+      const rsvp = await this.prisma.rsvp.findUnique({
         where: {
-          userId_eventId: {
+          eventId_userId: {
             eventId: eventIdResult.value,
             userId,
           },
@@ -131,7 +161,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
     status: IRSVP["status"],
   ): Promise<Result<IRSVP, Error>> {
     try {
-      const updated = await this.prisma.rSVP.update({
+      const updated = await this.prisma.rsvp.update({
         where: { id: rsvpId },
         data: { status },
       });
@@ -153,7 +183,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
         return Err(eventIdResult.value);
       }
 
-      const rsvps = await this.prisma.rSVP.findMany({
+      const rsvps = await this.prisma.rsvp.findMany({
         where: { eventId: eventIdResult.value },
         orderBy: { createdAt: "asc" },
       });
@@ -171,7 +201,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
 
   async getRSVPsByUser(userId: string): Promise<Result<IRSVP[], Error>> {
     try {
-      const rsvps = await this.prisma.rSVP.findMany({
+      const rsvps = await this.prisma.rsvp.findMany({
         where: { userId },
         orderBy: { createdAt: "asc" },
       });
@@ -187,6 +217,36 @@ class PrismaRSVPRepository implements IRSVPRepository {
     }
   }
 
+  async getRSVPsWithEventsByUser(
+    userId: string,
+  ): Promise<Result<Array<{ event: IEvent; rsvp: IRSVP }>, Error>> {
+    try {
+      const rsvps = await this.prisma.rsvp.findMany({
+        where: { userId },
+        include: {
+          event: true,
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const results = rsvps.map((record) => ({
+        rsvp: this.toRSVP(record),
+        event: this.toEvent(record.event),
+      }));
+
+      this.logger.info(
+        `getRSVPsWithEventsByUser: found ${results.length} RSVP dashboard item(s) for user ${userId}.`,
+      );
+
+      return Ok(results);
+    } catch (error) {
+      this.logger.error(
+        `getRSVPsWithEventsByUser failed for user ${userId}: ${error}`,
+      );
+      return Err(new Error(`Failed to retrieve RSVP dashboard items: ${error}`));
+    }
+  }
+
   async cancelRSVPWithPromotion(
     eventId: string,
     userId: string,
@@ -199,9 +259,9 @@ class PrismaRSVPRepository implements IRSVPRepository {
       }
 
       const result = await this.prisma.$transaction(async (tx) => {
-        const existing = await tx.rSVP.findUnique({
+        const existing = await tx.rsvp.findUnique({
           where: {
-            userId_eventId: {
+            eventId_userId: {
               eventId: eventIdResult.value,
               userId,
             },
@@ -216,7 +276,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
           return Err(RSVPStateError("RSVP is already cancelled."));
         }
 
-        const cancelled = await tx.rSVP.update({
+        const cancelled = await tx.rsvp.update({
           where: { id: existing.id },
           data: { status: "cancelled" },
         });
@@ -227,7 +287,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
           return Ok({ cancelled: cancelledRSVP });
         }
 
-        const nextWaitlisted = await tx.rSVP.findFirst({
+        const nextWaitlisted = await tx.rsvp.findFirst({
           where: {
             eventId: eventIdResult.value,
             status: "waitlisted",
@@ -239,7 +299,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
           return Ok({ cancelled: cancelledRSVP });
         }
 
-        const promoted = await tx.rSVP.update({
+        const promoted = await tx.rsvp.update({
           where: { id: nextWaitlisted.id },
           data: { status: "going" },
         });

@@ -255,31 +255,50 @@ class RSVPService implements IRSVPService {
       return Err(RSVPAuthorizationError("Only members can access the RSVP dashboard."));
     }
 
-    const rsvpsResult = await this.rsvpRepository.getRSVPsByUser(userId);
+    let dashboardItems: Array<{ event: IEvent; rsvp: IRSVP }> = [];
 
-    if (rsvpsResult.ok === false) {
-      return Err(rsvpsResult.value);
+    if (this.rsvpRepository.getRSVPsWithEventsByUser) {
+      const dashboardItemsResult =
+        await this.rsvpRepository.getRSVPsWithEventsByUser(userId);
+
+      if (dashboardItemsResult.ok === false) {
+        return Err(dashboardItemsResult.value);
+      }
+
+      dashboardItems = dashboardItemsResult.value;
+    } else {
+      const rsvpsResult = await this.rsvpRepository.getRSVPsByUser(userId);
+
+      if (rsvpsResult.ok === false) {
+        return Err(rsvpsResult.value);
+      }
+
+      for (const rsvp of rsvpsResult.value) {
+        const eventResult = await this.eventRepository.getEvent(rsvp.eventId);
+
+        if (eventResult.ok === false) {
+          continue;
+        }
+
+        dashboardItems.push({
+          event: eventResult.value,
+          rsvp,
+        });
+      }
     }
 
     const upcoming: Array<{ event: IEvent; rsvp: IRSVP }> = [];
     const past: Array<{ event: IEvent; rsvp: IRSVP }> = [];
 
-    for (const rsvp of rsvpsResult.value) {
-      const eventResult = await this.eventRepository.getEvent(rsvp.eventId);
-
-      if (eventResult.ok === false) {
-        continue;
-      }
-
-      const event = eventResult.value;
-      const eventEnded = new Date(event.endDateTime) < new Date();
-      const eventCancelled = event.status === "cancelled";
-      const rsvpCancelled = rsvp.status === "cancelled";
+    for (const item of dashboardItems) {
+      const eventEnded = new Date(item.event.endDateTime) < new Date();
+      const eventCancelled = item.event.status === "cancelled";
+      const rsvpCancelled = item.rsvp.status === "cancelled";
 
       if (eventEnded || eventCancelled || rsvpCancelled) {
-        past.push({ event, rsvp });
+        past.push(item);
       } else {
-        upcoming.push({ event, rsvp });
+        upcoming.push(item);
       }
     }
 
