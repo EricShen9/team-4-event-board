@@ -7,4 +7,8 @@ export interface IRSVPRepository {
   updateRSVPStatus(rsvpId: string, status: IRSVP["status"]): Promise<Result<IRSVP, Error>>;
   getRSVPsByEvent(eventId: string): Promise<Result<IRSVP[], Error>>;
   getRSVPsByUser(userId: string): Promise<Result<IRSVP[], Error>>;
+  cancelRSVPWithPromotion(
+    eventId: string,
+    userId: string,
+  ): Promise<Result<{ cancelled: IRSVP; promoted?: IRSVP }, Error>>;
 }

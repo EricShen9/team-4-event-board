@@ -20,7 +20,25 @@ model Event {
   createdAt     String
   updatedAt     String?
 
+  rsvps         Rsvp[]
+
   @@index([organizerId])
   @@index([status])
   @@index([startDateTime])
+}
+
+model Rsvp {
+  id        String @id
+  eventId   Int
+  userId    String
+  status    String
+  createdAt String
+
+  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }

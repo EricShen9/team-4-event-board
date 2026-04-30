@@ -4,17 +4,20 @@ import { createComposedApp } from "../../src/composition";
 import { PrismaClient } from "@prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
-process.env.DATABASE_URL = "file:./prisma/test.db";
-
-const testAdapter = new PrismaBetterSqlite3({ url: "file:./prisma/test.db" });
-const testPrisma = new PrismaClient({ adapter: testAdapter });
-
 describe("GET /events/:id — event detail page", () => {
+    const adapter = new PrismaBetterSqlite3({
+    url: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
+  });
+
+  const prisma = new PrismaClient({ adapter });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
   let app: Express;
 
   beforeAll(async () => {
     await testPrisma.event.deleteMany();
-    await testPrisma.$executeRawUnsafe("DELETE FROM sqlite_sequence WHERE name='Event'");
     app = createComposedApp().getExpressApp();
   });
 
@@ -44,25 +47,45 @@ describe("GET /events/:id — event detail page", () => {
     };
   }
 
- async function createDraftEvent(
-    agent: InstanceType<typeof request.agent>,
+  async function createDraftEvent(
+    agent: ReturnType<typeof request.agent>,
     overrides: Record<string, string> = {},
   ): Promise<string> {
-    const title = overrides.title ?? "Detail Test Event";
-    await agent.post("/events").type("form").send(validPayload(overrides));
+    const baseTitle = overrides.title ?? "Detail Test Event";
+    const uniqueTitle = `${baseTitle} ${crypto.randomUUID()}`;
 
-    const event = await testPrisma.event.findFirst({
-      where: { title },
-      orderBy: { id: "desc" },
-    });
-    if (!event) {
-      throw new Error(`Event "${title}" not found in database after creation`);
+    const res = await agent
+      .post("/events")
+      .type("form")
+      .send(
+        validPayload({
+          ...overrides,
+          title: uniqueTitle,
+        }),
+      );
+
+    if (!res.text.includes("Event created successfully")) {
+      throw new Error(`Event creation failed: ${res.text.slice(0, 200)}`);
     }
-    return event.id.toString();
+
+    const event = await prisma.event.findFirst({
+      where: {
+        title: uniqueTitle,
+      },
+      orderBy: {
+        id: "desc",
+      },
+    });
+
+    if (!event) {
+      throw new Error("Created event not found in Prisma database.");
+    }
+
+    return String(event.id);
   }
 
   async function createPublishedEvent(
-    agent: InstanceType<typeof request.agent>,
+    agent: ReturnType<typeof request.agent>,
     overrides: Record<string, string> = {},
   ): Promise<string> {
     const id = await createDraftEvent(agent, overrides);
