@@ -2,13 +2,28 @@
 
 import request from "supertest";
 import type { Express } from "express";
+import { PrismaClient } from "@prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+
+// Set test database BEFORE the app is imported/created
+const testDatabaseUrl = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
+process.env.DATABASE_URL = testDatabaseUrl;
+
 import { createComposedApp } from "../../src/composition";
+
+const testAdapter = new PrismaBetterSqlite3({ url: testDatabaseUrl });
+const testPrisma = new PrismaClient({ adapter: testAdapter });
 
 describe("Event Publishing and Cancellation", () => {
   let app: Express;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    await testPrisma.event.deleteMany();
     app = createComposedApp().getExpressApp();
+  });
+
+  afterAll(async () => {
+    await testPrisma.$disconnect();
   });
 
   // ── Helpers ────────────────────────────────────────────────────────
@@ -37,35 +52,44 @@ describe("Event Publishing and Cancellation", () => {
 
   /**
    * Create a draft event via POST /events and return its ID.
-   * Relies on sequential in-memory ID generation starting at 1.
-   * Verifies the event exists at the expected ID before returning.
+   * Queries the database directly to find the created event's ID
+   * rather than relying on sequential ID generation.
    */
-  let nextExpectedId = 1;
   async function createDraftEvent(
-    agent: InstanceType<typeof request.agent>,
+    agent: ReturnType<typeof request.agent>,
     overrides: Record<string, string> = {},
   ): Promise<string> {
+    const baseTitle = overrides.title ?? "Lifecycle Test Event";
+    const uniqueTitle = `${baseTitle} ${crypto.randomUUID()}`;
+
     const res = await agent
       .post("/events")
       .type("form")
-      .send(validPayload(overrides));
+      .send(
+        validPayload({
+          ...overrides,
+          title: uniqueTitle,
+        }),
+      );
 
     if (!res.text.includes("Event created successfully")) {
       throw new Error(`Event creation failed: ${res.text.slice(0, 200)}`);
     }
 
-    const id = String(nextExpectedId++);
+    const event = await testPrisma.event.findFirst({
+        where: {
+        title: uniqueTitle,
+      },
+      orderBy: {
+        id: "desc",
+      },
+    });
 
-    // Verify the event exists at the expected ID
-    const title = overrides.title ?? "Lifecycle Test Event";
-    const detailRes = await agent.get(`/events/${id}`);
-    if (detailRes.status !== 200 || !detailRes.text.includes(title)) {
-      throw new Error(
-        `Expected event "${title}" at /events/${id} but got status ${detailRes.status}`,
-      );
+    if (!event) {
+      throw new Error("Created event not found in Prisma database.");
     }
 
-    return id;
+    return String(event.id);
   }
 
   // ── POST /events/:id/publish ─────────────────────────────────────

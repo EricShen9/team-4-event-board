@@ -2,7 +2,16 @@
 
 import request from "supertest";
 import type { Express } from "express";
+import { PrismaClient } from "@prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+
+const testDatabaseUrl = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
+process.env.DATABASE_URL = testDatabaseUrl;
+
 import { createComposedApp } from "../../src/composition";
+
+const testAdapter = new PrismaBetterSqlite3({ url: testDatabaseUrl });
+const prisma = new PrismaClient({ adapter: testAdapter });
 
 describe("POST /events/:id — event editing", () => {
   let app: Express;
@@ -10,9 +19,11 @@ describe("POST /events/:id — event editing", () => {
   let cancellableEventId: string;
 
   beforeAll(async () => {
+    await prisma.rsvp.deleteMany();
+    await prisma.event.deleteMany();
+
     app = createComposedApp().getExpressApp();
 
-    // ── Setup: create and publish two events via the API ───────────
     const agent = request.agent(app);
     await agent
       .post("/login")
@@ -29,31 +40,55 @@ describe("POST /events/:id — event editing", () => {
       endDateTime: dayAfter.toISOString().slice(0, 16),
     };
 
-    // Event 1 — general editing tests (auto-ID "1")
+    const editableTitle = `Editable Event ${crypto.randomUUID()}`;
     const r1 = await agent
       .post("/events")
       .type("form")
-      .send({ ...basePayload, title: "Editable Event" });
+      .send({ ...basePayload, title: editableTitle });
     expect(r1.status).toBe(200);
-    editableEventId = "1";
+
+    const editableEvent = await prisma.event.findFirst({
+      where: { title: editableTitle },
+      orderBy: { id: "desc" },
+    });
+
+    if (!editableEvent) {
+      throw new Error("Editable Event not found in database.");
+    }
+
+    editableEventId = String(editableEvent.id);
 
     await agent
       .post(`/events/${editableEventId}/publish`)
       .type("form")
       .send({});
 
-    // Event 2 — cancel-then-edit test (auto-ID "2")
+    const cancellableTitle = `Cancellable Event ${crypto.randomUUID()}`;
     const r2 = await agent
       .post("/events")
       .type("form")
-      .send({ ...basePayload, title: "Cancellable Event" });
+      .send({ ...basePayload, title: cancellableTitle });
     expect(r2.status).toBe(200);
-    cancellableEventId = "2";
+
+    const cancellableEvent = await prisma.event.findFirst({
+      where: { title: cancellableTitle },
+      orderBy: { id: "desc" },
+    });
+
+    if (!cancellableEvent) {
+      throw new Error("Cancellable Event not found in database.");
+    }
+
+    cancellableEventId = String(cancellableEvent.id);
 
     await agent
       .post(`/events/${cancellableEventId}/publish`)
       .type("form")
       .send({});
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
   });
 
   // ── Helpers ────────────────────────────────────────────────────────
@@ -340,13 +375,11 @@ describe("POST /events/:id — event editing", () => {
     it("returns 400 when editing a cancelled event", async () => {
       const agent = await loginAs("admin@app.test", "password123");
 
-      // Cancel the event (setup — uses the dedicated cancellable event)
       await agent
         .post(`/events/${cancellableEventId}/cancel`)
         .type("form")
         .send({});
 
-      // Now attempt to edit the cancelled event
       const res = await agent
         .post(`/events/${cancellableEventId}`)
         .type("form")

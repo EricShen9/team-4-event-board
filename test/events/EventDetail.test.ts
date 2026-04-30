@@ -1,14 +1,28 @@
-// test/events/EventDetail.test.ts
-
 import request from "supertest";
 import type { Express } from "express";
 import { createComposedApp } from "../../src/composition";
+import { PrismaClient } from "@prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
 describe("GET /events/:id — event detail page", () => {
+    const adapter = new PrismaBetterSqlite3({
+    url: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
+  });
+
+  const prisma = new PrismaClient({ adapter });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
   let app: Express;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    await prisma.event.deleteMany();
     app = createComposedApp().getExpressApp();
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
   });
 
   // ── Helpers ────────────────────────────────────────────────────────
@@ -33,17 +47,45 @@ describe("GET /events/:id — event detail page", () => {
     };
   }
 
-  let nextExpectedId = 1;
   async function createDraftEvent(
-    agent: InstanceType<typeof request.agent>,
+    agent: ReturnType<typeof request.agent>,
     overrides: Record<string, string> = {},
   ): Promise<string> {
-    await agent.post("/events").type("form").send(validPayload(overrides));
-    return String(nextExpectedId++);
+    const baseTitle = overrides.title ?? "Detail Test Event";
+    const uniqueTitle = `${baseTitle} ${crypto.randomUUID()}`;
+
+    const res = await agent
+      .post("/events")
+      .type("form")
+      .send(
+        validPayload({
+          ...overrides,
+          title: uniqueTitle,
+        }),
+      );
+
+    if (!res.text.includes("Event created successfully")) {
+      throw new Error(`Event creation failed: ${res.text.slice(0, 200)}`);
+    }
+
+    const event = await prisma.event.findFirst({
+      where: {
+        title: uniqueTitle,
+      },
+      orderBy: {
+        id: "desc",
+      },
+    });
+
+    if (!event) {
+      throw new Error("Created event not found in Prisma database.");
+    }
+
+    return String(event.id);
   }
 
   async function createPublishedEvent(
-    agent: InstanceType<typeof request.agent>,
+    agent: ReturnType<typeof request.agent>,
     overrides: Record<string, string> = {},
   ): Promise<string> {
     const id = await createDraftEvent(agent, overrides);
@@ -61,7 +103,7 @@ describe("GET /events/:id — event detail page", () => {
     });
   });
 
-  // ── Published event  ──────────────────────────────────
+  // ── Published event ───────────────────────────────────────────────
 
   describe("published event", () => {
     it("returns 200 and shows event details for a published event", async () => {
@@ -130,7 +172,6 @@ describe("GET /events/:id — event detail page", () => {
     });
 
     it("different staff member cannot see another staff's draft", async () => {
-      // Staff creates a draft, but since there's only one staff account in demo, we test with user role instead, which should also be blocked
       const staffAgent = await loginAs("staff@app.test", "password123");
       const eventId = await createDraftEvent(staffAgent, { title: "Private Staff Draft" });
 
@@ -144,10 +185,9 @@ describe("GET /events/:id — event detail page", () => {
   // ── Edge case ─────────────────────────────────────────────────────
 
   describe("edge cases", () => {
-    it("returns 404 for an empty event ID", async () => {
+    it("returns 200 for empty event ID (hits list route)", async () => {
       const agent = await loginAs("user@app.test", "password123");
       const res = await agent.get("/events/");
-      // --> /events (the list route) not /events/:id
       expect(res.status).toBe(200);
     });
   });

@@ -2,28 +2,42 @@
 
 import request from "supertest";
 import type { Express } from "express";
+import { PrismaClient } from "@prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+
+const testDatabaseUrl = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
+process.env.DATABASE_URL = testDatabaseUrl;
+
 import { createComposedApp } from "../../src/composition";
+
+const testAdapter = new PrismaBetterSqlite3({ url: testDatabaseUrl });
+const testPrisma = new PrismaClient({ adapter: testAdapter });
 
 describe("Organizer Event Dashboard", () => {
   let app: Express;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    await testPrisma.rsvp.deleteMany();
+    await testPrisma.event.deleteMany();
     app = createComposedApp().getExpressApp();
+  });
+
+  afterAll(async () => {
+    await testPrisma.$disconnect();
   });
 
   // ── Helpers ────────────────────────────────────────────────────────
 
-  /** Return a supertest agent with an authenticated session. */
   async function loginAs(email: string, password: string) {
     const agent = request.agent(app);
     await agent.post("/login").type("form").send({ email, password });
     return agent;
   }
 
-  /** Baseline valid form payload — override individual fields per test. */
   function validPayload(overrides: Record<string, string> = {}) {
     const tomorrow = new Date(Date.now() + 86_400_000);
     const dayAfter = new Date(Date.now() + 2 * 86_400_000);
+
     return {
       title: "Dashboard Test Event",
       description: "A description for dashboard testing",
@@ -36,31 +50,48 @@ describe("Organizer Event Dashboard", () => {
   }
 
   /**
-   * Create a draft event via POST /events and return its ID.
-   * Relies on sequential in-memory ID generation.
-   * Verifies the event exists at the expected ID before returning.
+   * Create a draft event via POST /events and return its actual Prisma ID.
    */
-  let nextExpectedId = 1;
   async function createDraftEvent(
-    agent: any,
+    agent: ReturnType<typeof request.agent>,
     overrides: Record<string, string> = {},
   ): Promise<string> {
+    const baseTitle = overrides.title ?? "Dashboard Test Event";
+    const uniqueTitle = `${baseTitle} ${crypto.randomUUID()}`;
+
     const res = await agent
       .post("/events")
       .type("form")
-      .send(validPayload(overrides));
+      .send(
+        validPayload({
+          ...overrides,
+          title: uniqueTitle,
+        }),
+      );
 
     if (!res.text.includes("Event created successfully")) {
       throw new Error(`Event creation failed: ${res.text.slice(0, 200)}`);
     }
 
-    const id = String(nextExpectedId++);
+    const event = await testPrisma.event.findFirst({
+      where: {
+        title: uniqueTitle,
+      },
+      orderBy: {
+        id: "desc",
+      },
+    });
 
-    const title = overrides.title ?? "Dashboard Test Event";
+    if (!event) {
+      throw new Error(`Event "${uniqueTitle}" not found in database after creation`);
+    }
+
+    const id = event.id.toString();
+
     const detailRes = await agent.get(`/events/${id}`);
-    if (detailRes.status !== 200 || !detailRes.text.includes(title)) {
+    if (detailRes.status !== 200 || !detailRes.text.includes(baseTitle)) {
       throw new Error(
-        `Expected event "${title}" at /events/${id} but got status ${detailRes.status}`,
+        `Expected event "${baseTitle}" at /events/${id} but got status ${detailRes.status}`,
       );
     }
 
@@ -111,6 +142,7 @@ describe("Organizer Event Dashboard", () => {
   describe("organizer sees only their own events", () => {
     it("staff dashboard displays events they created", async () => {
       const staffAgent = await loginAs("staff@app.test", "password123");
+
       await createDraftEvent(staffAgent, { title: "Staff Event Alpha" });
       await createDraftEvent(staffAgent, { title: "Staff Event Beta" });
 
@@ -122,17 +154,14 @@ describe("Organizer Event Dashboard", () => {
     });
 
     it("staff dashboard does not show events created by other organizers", async () => {
-      // Admin creates an event
       const adminAgent = await loginAs("admin@app.test", "password123");
       await createDraftEvent(adminAgent, { title: "Admin Secret Event" });
 
-      // Staff views dashboard — admin's event must not appear
       const staffAgent = await loginAs("staff@app.test", "password123");
       const res = await staffAgent.get("/organizer-dashboard");
 
       expect(res.status).toBe(200);
       expect(res.text).not.toContain("Admin Secret Event");
-      // Staff's own events from the previous test still appear
       expect(res.text).toContain("Staff Event Alpha");
       expect(res.text).toContain("Staff Event Beta");
     });
@@ -147,10 +176,8 @@ describe("Organizer Event Dashboard", () => {
       const res = await adminAgent.get("/organizer-dashboard");
 
       expect(res.status).toBe(200);
-      // Staff's events
       expect(res.text).toContain("Staff Event Alpha");
       expect(res.text).toContain("Staff Event Beta");
-      // Admin's own event
       expect(res.text).toContain("Admin Secret Event");
     });
 
@@ -181,7 +208,10 @@ describe("Organizer Event Dashboard", () => {
 
     it("published events appear in the Published section", async () => {
       const staffAgent = await loginAs("staff@app.test", "password123");
-      const eventId = await createDraftEvent(staffAgent, { title: "Staff Published Event" });
+      const eventId = await createDraftEvent(staffAgent, {
+        title: "Staff Published Event",
+      });
+
       await staffAgent.post(`/events/${eventId}/publish`);
 
       const res = await staffAgent.get("/organizer-dashboard");
@@ -193,7 +223,10 @@ describe("Organizer Event Dashboard", () => {
 
     it("cancelled events appear in the Cancelled / Past section", async () => {
       const staffAgent = await loginAs("staff@app.test", "password123");
-      const eventId = await createDraftEvent(staffAgent, { title: "Staff Cancelled Event" });
+      const eventId = await createDraftEvent(staffAgent, {
+        title: "Staff Cancelled Event",
+      });
+
       await staffAgent.post(`/events/${eventId}/publish`);
       await staffAgent.post(`/events/${eventId}/cancel`);
 
@@ -227,6 +260,5 @@ describe("Organizer Event Dashboard", () => {
       expect(res.text).toMatch(/hx-post="\/events\/\d+\/cancel"/);
       expect(res.text).toContain("hx-confirm=");
     });
-
   });
-}); 
+});

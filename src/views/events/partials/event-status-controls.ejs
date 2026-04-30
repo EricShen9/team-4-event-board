@@ -23,8 +23,7 @@
     <% const isOrganizer = session.authenticatedUser.userId === event.organizerId; %>
     <% const isAdmin = session.authenticatedUser.role === 'admin'; %>
 
-    <% if (event.status === 'draft' && isOrganizer) { %>
-      <div class="mb-3">
+    <% if (event.status === 'draft' && (isOrganizer || isAdmin)) { %>      <div class="mb-3">
         <button
           hx-post="/events/<%= event.id %>/publish"
           hx-target="#event-status-controls-<%= event.id %>"

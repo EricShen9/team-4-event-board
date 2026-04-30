@@ -72,7 +72,75 @@ class InMemoryRSVPRepository implements IRSVPRepository {
     this.logger.info(`getRSVPsByUser: found ${rsvps.length} RSVPs for user ${userId}.`);
     return Ok(rsvps);
   }
+
+  async cancelRSVPWithPromotion(
+    eventId: string,
+    userId: string,
+  ): Promise<Result<{ cancelled: IRSVP; promoted?: IRSVP }, Error>> {
+    const existingResult = await this.getRSVPByUserAndEvent(userId, eventId);
+
+    if (existingResult.ok === false) {
+      return Err(existingResult.value);
+    }
+
+    const existing = existingResult.value;
+
+    if (!existing) {
+      this.logger.warn(
+        `cancelRSVPWithPromotion: RSVP not found for user ${userId} on event ${eventId}.`,
+      );
+      return Err(new Error("RSVP not found."));
+    }
+
+    if (existing.status === "cancelled") {
+      this.logger.warn(
+        `cancelRSVPWithPromotion: RSVP already cancelled for user ${userId} on event ${eventId}.`,
+      );
+      return Err(new Error("RSVP is already cancelled."));
+    }
+
+    const cancelledResult = await this.updateRSVPStatus(existing.id, "cancelled");
+
+    if (cancelledResult.ok === false) {
+      return Err(cancelledResult.value);
+    }
+
+    const cancelled = cancelledResult.value;
+
+    if (existing.status !== "going") {
+      return Ok({ cancelled });
+    }
+
+    const eventRSVPsResult = await this.getRSVPsByEvent(eventId);
+
+    if (eventRSVPsResult.ok === false) {
+      return Err(eventRSVPsResult.value);
+    }
+
+    const nextWaitlisted = eventRSVPsResult.value
+      .filter((rsvp) => rsvp.status === "waitlisted")
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      )[0];
+
+    if (!nextWaitlisted) {
+      return Ok({ cancelled });
+    }
+
+    const promotedResult = await this.updateRSVPStatus(nextWaitlisted.id, "going");
+
+    if (promotedResult.ok === false) {
+      return Err(promotedResult.value);
+    }
+
+    return Ok({
+      cancelled,
+      promoted: promotedResult.value,
+    });
+  }
 }
+
 
 export function CreateInMemoryRSVPRepository(
   logger: ILoggingService,

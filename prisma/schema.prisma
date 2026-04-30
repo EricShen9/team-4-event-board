@@ -6,14 +6,39 @@ datasource db {
   provider = "sqlite"
 }
 
-// TODO: Define your project's data models here.
-// Example:
-//
-// model Item {
-//   id        Int      @id @default(autoincrement())
-//   title     String
-//   body      String
-//   status    String   @default("active")
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }
+model Event {
+  id            Int      @id @default(autoincrement())
+  organizerId   String
+  title         String
+  description   String
+  location      String
+  category      String
+  status        String
+  startDateTime String
+  endDateTime   String
+  capacity      Int?
+  createdAt     String
+  updatedAt     String?
+
+  rsvps         Rsvp[]
+
+  @@index([organizerId])
+  @@index([status])
+  @@index([startDateTime])
+}
+
+model Rsvp {
+  id        String @id
+  eventId   Int
+  userId    String
+  status    String
+  createdAt String
+
+  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
