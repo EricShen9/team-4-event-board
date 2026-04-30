@@ -2,13 +2,28 @@
 
 import request from "supertest";
 import type { Express } from "express";
+import { PrismaClient } from "@prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+
+// Set test database BEFORE the app is imported/created
+process.env.DATABASE_URL = "file:./prisma/test.db";
+
 import { createComposedApp } from "../../src/composition";
+
+// Separate Prisma client for direct DB access in tests
+const testAdapter = new PrismaBetterSqlite3({ url: "file:./prisma/test.db" });
+const testPrisma = new PrismaClient({ adapter: testAdapter });
 
 describe("Event Publishing and Cancellation", () => {
   let app: Express;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    await testPrisma.event.deleteMany();
     app = createComposedApp().getExpressApp();
+  });
+
+  afterAll(async () => {
+    await testPrisma.$disconnect();
   });
 
   // ── Helpers ────────────────────────────────────────────────────────
@@ -37,10 +52,9 @@ describe("Event Publishing and Cancellation", () => {
 
   /**
    * Create a draft event via POST /events and return its ID.
-   * Relies on sequential in-memory ID generation starting at 1.
-   * Verifies the event exists at the expected ID before returning.
+   * Queries the database directly to find the created event's ID
+   * rather than relying on sequential ID generation.
    */
-  let nextExpectedId = 1;
   async function createDraftEvent(
     agent: InstanceType<typeof request.agent>,
     overrides: Record<string, string> = {},
@@ -54,10 +68,21 @@ describe("Event Publishing and Cancellation", () => {
       throw new Error(`Event creation failed: ${res.text.slice(0, 200)}`);
     }
 
-    const id = String(nextExpectedId++);
+    const title = overrides.title ?? "Test Event";
+
+    // Query the DB for the most recently created event with this title
+    const event = await testPrisma.event.findFirst({
+      where: { title },
+      orderBy: { id: "desc" },
+    });
+
+    if (!event) {
+      throw new Error(`Event "${title}" not found in database after creation`);
+    }
+
+    const id = event.id.toString();
 
     // Verify the event exists at the expected ID
-    const title = overrides.title ?? "Lifecycle Test Event";
     const detailRes = await agent.get(`/events/${id}`);
     if (detailRes.status !== 200 || !detailRes.text.includes(title)) {
       throw new Error(
