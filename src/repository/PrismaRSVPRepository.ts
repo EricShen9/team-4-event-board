@@ -69,7 +69,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
         return Err(eventIdResult.value);
       }
 
-      const created = await this.prisma.rsvp.create({
+      const created = await this.prisma.rSVP.create({
         data: {
           id: rsvp.id,
           eventId: eventIdResult.value,
@@ -99,9 +99,9 @@ class PrismaRSVPRepository implements IRSVPRepository {
         return Err(eventIdResult.value);
       }
 
-      const rsvp = await this.prisma.rsvp.findUnique({
+      const rsvp = await this.prisma.rSVP.findUnique({
         where: {
-          eventId_userId: {
+          userId_eventId: {
             eventId: eventIdResult.value,
             userId,
           },
@@ -131,7 +131,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
     status: IRSVP["status"],
   ): Promise<Result<IRSVP, Error>> {
     try {
-      const updated = await this.prisma.rsvp.update({
+      const updated = await this.prisma.rSVP.update({
         where: { id: rsvpId },
         data: { status },
       });
@@ -153,7 +153,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
         return Err(eventIdResult.value);
       }
 
-      const rsvps = await this.prisma.rsvp.findMany({
+      const rsvps = await this.prisma.rSVP.findMany({
         where: { eventId: eventIdResult.value },
         orderBy: { createdAt: "asc" },
       });
@@ -171,7 +171,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
 
   async getRSVPsByUser(userId: string): Promise<Result<IRSVP[], Error>> {
     try {
-      const rsvps = await this.prisma.rsvp.findMany({
+      const rsvps = await this.prisma.rSVP.findMany({
         where: { userId },
         orderBy: { createdAt: "asc" },
       });
@@ -199,9 +199,9 @@ class PrismaRSVPRepository implements IRSVPRepository {
       }
 
       const result = await this.prisma.$transaction(async (tx) => {
-        const existing = await tx.rsvp.findUnique({
+        const existing = await tx.rSVP.findUnique({
           where: {
-            eventId_userId: {
+            userId_eventId: {
               eventId: eventIdResult.value,
               userId,
             },
@@ -216,7 +216,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
           return Err(RSVPStateError("RSVP is already cancelled."));
         }
 
-        const cancelled = await tx.rsvp.update({
+        const cancelled = await tx.rSVP.update({
           where: { id: existing.id },
           data: { status: "cancelled" },
         });
@@ -227,7 +227,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
           return Ok({ cancelled: cancelledRSVP });
         }
 
-        const nextWaitlisted = await tx.rsvp.findFirst({
+        const nextWaitlisted = await tx.rSVP.findFirst({
           where: {
             eventId: eventIdResult.value,
             status: "waitlisted",
@@ -239,7 +239,7 @@ class PrismaRSVPRepository implements IRSVPRepository {
           return Ok({ cancelled: cancelledRSVP });
         }
 
-        const promoted = await tx.rsvp.update({
+        const promoted = await tx.rSVP.update({
           where: { id: nextWaitlisted.id },
           data: { status: "going" },
         });
