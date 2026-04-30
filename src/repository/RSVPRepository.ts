@@ -1,5 +1,5 @@
 import {Result} from "../lib/result";
-import type {IRSVP} from "./EventRepository";
+import type {IEvent, IRSVP} from "./EventRepository";
 
 export interface IRSVPRepository {
   addRSVP(rsvp: IRSVP): Promise<Result<IRSVP, Error>>;
@@ -7,6 +7,11 @@ export interface IRSVPRepository {
   updateRSVPStatus(rsvpId: string, status: IRSVP["status"]): Promise<Result<IRSVP, Error>>;
   getRSVPsByEvent(eventId: string): Promise<Result<IRSVP[], Error>>;
   getRSVPsByUser(userId: string): Promise<Result<IRSVP[], Error>>;
+
+  getRSVPsWithEventsByUser?(
+    userId: string,
+  ): Promise<Result<Array<{ event: IEvent; rsvp: IRSVP }>, Error>>;
+
   cancelRSVPWithPromotion(
     eventId: string,
     userId: string,
