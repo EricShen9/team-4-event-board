@@ -17,7 +17,7 @@ describe("Organizer Event Dashboard", () => {
   let app: Express;
 
   beforeAll(async () => {
-    await testPrisma.rSVP.deleteMany();
+    await testPrisma.rsvp.deleteMany();
     await testPrisma.event.deleteMany();
     app = createComposedApp().getExpressApp();
   });

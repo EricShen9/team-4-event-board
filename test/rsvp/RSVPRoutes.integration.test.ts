@@ -12,7 +12,7 @@ const testPrisma = new PrismaClient({ adapter: testAdapter });
 
 describe("RSVP routes integration", () => {
   beforeAll(async () => {
-    await testPrisma.rSVP.deleteMany();
+    await testPrisma.rsvp.deleteMany();
     await testPrisma.event.deleteMany();
   });
 
