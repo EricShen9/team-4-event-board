@@ -2,8 +2,19 @@
 import request from "supertest";
 import type { Express } from "express";
 import { createComposedApp } from "../../src/composition";
+import { PrismaClient } from "@prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
 describe("GET /events — event list and filter", () => {
+  const adapter = new PrismaBetterSqlite3({
+    url: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
+  });
+
+  const prisma = new PrismaClient({ adapter });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
   let app: Express;
 
   beforeAll(() => {
@@ -32,15 +43,43 @@ describe("GET /events — event list and filter", () => {
     };
   }
 
-  let nextExpectedId = 1;
   async function createPublishedEvent(
-    agent: InstanceType<typeof request.agent>,
+    agent: ReturnType<typeof request.agent>,
     overrides: Record<string, string> = {},
   ): Promise<string> {
-    await agent.post("/events").type("form").send(validPayload(overrides));
-    const id = String(nextExpectedId++);
-    await agent.post(`/events/${id}/publish`);
-    return id;
+    const baseTitle = overrides.title ?? "Filter Test Event";
+    const uniqueTitle = `${baseTitle} ${crypto.randomUUID()}`;
+
+    const res = await agent
+      .post("/events")
+      .type("form")
+      .send(
+        validPayload({
+          ...overrides,
+          title: uniqueTitle,
+        }),
+      );
+
+    if (!res.text.includes("Event created successfully")) {
+      throw new Error(`Event creation failed: ${res.text.slice(0, 200)}`);
+    }
+
+    const event = await prisma.event.findFirst({
+      where: {
+        title: uniqueTitle,
+      },
+      orderBy: {
+        id: "desc",
+      },
+    });
+
+    if (!event) {
+      throw new Error("Created event not found in Prisma database.");
+    }
+
+    await agent.post(`/events/${event.id}/publish`);
+
+    return String(event.id);
   }
 
     // ── Authentication ─────────────────────────────────────────────────
@@ -86,7 +125,6 @@ describe("GET /events — event list and filter", () => {
       const agent = await loginAs("staff@app.test", "password123");
       // Create a draft but don't publish it
       await agent.post("/events").type("form").send(validPayload({ title: "Secret Draft" }));
-      nextExpectedId++;
 
       const userAgent = await loginAs("user@app.test", "password123");
       const res = await userAgent.get("/events");

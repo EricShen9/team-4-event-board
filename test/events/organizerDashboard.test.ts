@@ -5,19 +5,19 @@ import type { Express } from "express";
 import { PrismaClient } from "@prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
-// Set test database BEFORE the app is imported/created
-process.env.DATABASE_URL = "file:./prisma/test.db";
+const testDatabaseUrl = process.env.DATABASE_URL ?? "file:./prisma/dev.db";
+process.env.DATABASE_URL = testDatabaseUrl;
 
 import { createComposedApp } from "../../src/composition";
 
-// Separate Prisma client for direct DB access in tests
-const testAdapter = new PrismaBetterSqlite3({ url: "file:./prisma/test.db" });
+const testAdapter = new PrismaBetterSqlite3({ url: testDatabaseUrl });
 const testPrisma = new PrismaClient({ adapter: testAdapter });
 
 describe("Organizer Event Dashboard", () => {
   let app: Express;
 
   beforeAll(async () => {
+    await testPrisma.rSVP.deleteMany();
     await testPrisma.event.deleteMany();
     app = createComposedApp().getExpressApp();
   });
@@ -37,6 +37,7 @@ describe("Organizer Event Dashboard", () => {
   function validPayload(overrides: Record<string, string> = {}) {
     const tomorrow = new Date(Date.now() + 86_400_000);
     const dayAfter = new Date(Date.now() + 2 * 86_400_000);
+
     return {
       title: "Dashboard Test Event",
       description: "A description for dashboard testing",
@@ -49,41 +50,48 @@ describe("Organizer Event Dashboard", () => {
   }
 
   /**
-   * Create a draft event via POST /events and return its ID.
-   * Queries the database directly to find the created event's ID
-   * rather than relying on sequential ID generation.
+   * Create a draft event via POST /events and return its actual Prisma ID.
    */
   async function createDraftEvent(
-    agent: any,
+    agent: ReturnType<typeof request.agent>,
     overrides: Record<string, string> = {},
   ): Promise<string> {
+    const baseTitle = overrides.title ?? "Dashboard Test Event";
+    const uniqueTitle = `${baseTitle} ${crypto.randomUUID()}`;
+
     const res = await agent
       .post("/events")
       .type("form")
-      .send(validPayload(overrides));
+      .send(
+        validPayload({
+          ...overrides,
+          title: uniqueTitle,
+        }),
+      );
 
     if (!res.text.includes("Event created successfully")) {
       throw new Error(`Event creation failed: ${res.text.slice(0, 200)}`);
     }
 
-    const title = overrides.title ?? "Dashboard Test Event";
-
-    // Query the DB for the most recently created event with this title
     const event = await testPrisma.event.findFirst({
-      where: { title },
-      orderBy: { id: "desc" },
+      where: {
+        title: uniqueTitle,
+      },
+      orderBy: {
+        id: "desc",
+      },
     });
 
     if (!event) {
-      throw new Error(`Event "${title}" not found in database after creation`);
+      throw new Error(`Event "${uniqueTitle}" not found in database after creation`);
     }
 
     const id = event.id.toString();
 
     const detailRes = await agent.get(`/events/${id}`);
-    if (detailRes.status !== 200 || !detailRes.text.includes(title)) {
+    if (detailRes.status !== 200 || !detailRes.text.includes(baseTitle)) {
       throw new Error(
-        `Expected event "${title}" at /events/${id} but got status ${detailRes.status}`,
+        `Expected event "${baseTitle}" at /events/${id} but got status ${detailRes.status}`,
       );
     }
 
@@ -134,6 +142,7 @@ describe("Organizer Event Dashboard", () => {
   describe("organizer sees only their own events", () => {
     it("staff dashboard displays events they created", async () => {
       const staffAgent = await loginAs("staff@app.test", "password123");
+
       await createDraftEvent(staffAgent, { title: "Staff Event Alpha" });
       await createDraftEvent(staffAgent, { title: "Staff Event Beta" });
 
@@ -199,7 +208,10 @@ describe("Organizer Event Dashboard", () => {
 
     it("published events appear in the Published section", async () => {
       const staffAgent = await loginAs("staff@app.test", "password123");
-      const eventId = await createDraftEvent(staffAgent, { title: "Staff Published Event" });
+      const eventId = await createDraftEvent(staffAgent, {
+        title: "Staff Published Event",
+      });
+
       await staffAgent.post(`/events/${eventId}/publish`);
 
       const res = await staffAgent.get("/organizer-dashboard");
@@ -211,7 +223,10 @@ describe("Organizer Event Dashboard", () => {
 
     it("cancelled events appear in the Cancelled / Past section", async () => {
       const staffAgent = await loginAs("staff@app.test", "password123");
-      const eventId = await createDraftEvent(staffAgent, { title: "Staff Cancelled Event" });
+      const eventId = await createDraftEvent(staffAgent, {
+        title: "Staff Cancelled Event",
+      });
+
       await staffAgent.post(`/events/${eventId}/publish`);
       await staffAgent.post(`/events/${eventId}/cancel`);
 
