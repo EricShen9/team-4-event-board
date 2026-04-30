@@ -19,7 +19,7 @@ describe("POST /events/:id — event editing", () => {
   let cancellableEventId: string;
 
   beforeAll(async () => {
-    await prisma.rSVP.deleteMany();
+    await prisma.rsvp.deleteMany();
     await prisma.event.deleteMany();
 
     app = createComposedApp().getExpressApp();
