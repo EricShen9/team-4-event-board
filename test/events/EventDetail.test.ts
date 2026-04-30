@@ -17,12 +17,12 @@ describe("GET /events/:id — event detail page", () => {
   let app: Express;
 
   beforeAll(async () => {
-    await testPrisma.event.deleteMany();
+    await prisma.event.deleteMany();
     app = createComposedApp().getExpressApp();
   });
 
   afterAll(async () => {
-    await testPrisma.$disconnect();
+    await prisma.$disconnect();
   });
 
   // ── Helpers ────────────────────────────────────────────────────────
