@@ -1,4 +1,3 @@
-
 import request from "supertest";
 import type { Express } from "express";
 import { createComposedApp } from "../../src/composition";
@@ -17,11 +16,17 @@ describe("GET /events — event list and filter", () => {
   });
   let app: Express;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    await testPrisma.event.deleteMany();
+    await testPrisma.$executeRawUnsafe("DELETE FROM sqlite_sequence WHERE name='Event'");
     app = createComposedApp().getExpressApp();
   });
 
-    // ── Helpers ────────────────────────────────────────────────────────
+  afterAll(async () => {
+    await testPrisma.$disconnect();
+  });
+
+  // ── Helpers ────────────────────────────────────────────────────────
 
   async function loginAs(email: string, password: string) {
     const agent = request.agent(app);
