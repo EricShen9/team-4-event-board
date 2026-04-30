@@ -44,13 +44,21 @@ describe("GET /events/:id — event detail page", () => {
     };
   }
 
-  let nextExpectedId = 1;
-  async function createDraftEvent(
+ async function createDraftEvent(
     agent: InstanceType<typeof request.agent>,
     overrides: Record<string, string> = {},
   ): Promise<string> {
+    const title = overrides.title ?? "Detail Test Event";
     await agent.post("/events").type("form").send(validPayload(overrides));
-    return String(nextExpectedId++);
+
+    const event = await testPrisma.event.findFirst({
+      where: { title },
+      orderBy: { id: "desc" },
+    });
+    if (!event) {
+      throw new Error(`Event "${title}" not found in database after creation`);
+    }
+    return event.id.toString();
   }
 
   async function createPublishedEvent(

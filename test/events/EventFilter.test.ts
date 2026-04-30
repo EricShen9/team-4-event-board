@@ -45,13 +45,21 @@ describe("GET /events — event list and filter", () => {
     };
   }
 
-  let nextExpectedId = 1;
   async function createPublishedEvent(
     agent: InstanceType<typeof request.agent>,
     overrides: Record<string, string> = {},
   ): Promise<string> {
+    const title = overrides.title ?? "Filter Test Event";
     await agent.post("/events").type("form").send(validPayload(overrides));
-    const id = String(nextExpectedId++);
+
+    const event = await testPrisma.event.findFirst({
+      where: { title },
+      orderBy: { id: "desc" },
+    });
+    if (!event) {
+      throw new Error(`Event "${title}" not found in database after creation`);
+    }
+    const id = event.id.toString();
     await agent.post(`/events/${id}/publish`);
     return id;
   }
@@ -99,7 +107,6 @@ describe("GET /events — event list and filter", () => {
       const agent = await loginAs("staff@app.test", "password123");
       // Create a draft but don't publish it
       await agent.post("/events").type("form").send(validPayload({ title: "Secret Draft" }));
-      nextExpectedId++;
 
       const userAgent = await loginAs("user@app.test", "password123");
       const res = await userAgent.get("/events");
