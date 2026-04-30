@@ -17,13 +17,12 @@ describe("GET /events — event list and filter", () => {
   let app: Express;
 
   beforeAll(async () => {
-    await testPrisma.event.deleteMany();
-    await testPrisma.$executeRawUnsafe("DELETE FROM sqlite_sequence WHERE name='Event'");
+    await prisma.event.deleteMany();
     app = createComposedApp().getExpressApp();
   });
 
   afterAll(async () => {
-    await testPrisma.$disconnect();
+    await prisma.$disconnect();
   });
 
   // ── Helpers ────────────────────────────────────────────────────────
