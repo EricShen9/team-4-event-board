@@ -58,11 +58,14 @@ class EventService implements IEventService {
   }
 
   async createEvent(eventForm: Partial<IEvent>): Promise<Result<IEvent, Error>> {
-    if (eventForm.startDateTime! >= eventForm.endDateTime!) {
+    const startDate = new Date(eventForm.startDateTime!);
+    const endDate = new Date(eventForm.endDateTime!);
+    const createdDate = new Date(eventForm.createdAt!);
+    if (startDate >= endDate) {
       this.logger.warn("Create event: start is not before end.");
       return Err(EventValidationError("Event start must be before end time."));
     }
-    if (eventForm.startDateTime! < eventForm.createdAt!) {
+    if (startDate < createdDate) {
       this.logger.warn("Create event: start is before current time.");
       return Err(EventValidationError("Event start cannot be before current time."));
     }
