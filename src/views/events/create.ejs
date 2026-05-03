@@ -55,7 +55,7 @@
       />
     </div>
 
-    <div>
+    <div x-data="{ description: '' }">
       <label for="description" class="block text-sm font-medium mb-1">Description</label>
       <textarea
         id="description"
@@ -63,7 +63,11 @@
         rows="3"
         placeholder="Describe what the event is about…"
         class="w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-white focus:outline-2 focus:outline-blue-500/20 focus:border-blue-500 resize-y"
+        x-model="description"
       ></textarea>
+      <div class="text-right text-sm text-gray-500 mt-1">
+        <span x-text="description.length"></span> characters
+      </div>
     </div>
 
     <div>
