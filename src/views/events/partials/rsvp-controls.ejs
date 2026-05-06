@@ -68,13 +68,29 @@ const capacityText =
             <span class="h-2.5 w-2.5 rounded-full <%= statusDotClasses %>"></span>
             <%= statusText %>
           </span>
-
-          <% if (state.waitlistPosition !== null) { %>
-            <span class="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-sm font-bold text-orange-800">
-              Waitlist position: #<%= state.waitlistPosition %>
-            </span>
-          <% } %>
         </div>
+
+        <% if (state.waitlistPosition !== null) { %>
+          <div
+            class="mt-4 max-w-md rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4 shadow-sm"
+            aria-label="Waitlist position"
+          >
+            <div class="flex items-center gap-3">
+              <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-lg font-extrabold text-white shadow-sm">
+                #<%= state.waitlistPosition %>
+              </div>
+
+              <div>
+                <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-amber-700">
+                  Waitlist position
+                </p>
+                <p class="mt-1 text-sm font-semibold text-slate-700">
+                  You are currently number <strong class="text-amber-800"><%= state.waitlistPosition %></strong> on the waitlist.
+                </p>
+              </div>
+            </div>
+          </div>
+        <% } %>
 
         <p class="mt-3 max-w-xl text-sm leading-6 text-slate-600">
           <%= statusDescription %>
