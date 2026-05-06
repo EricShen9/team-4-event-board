@@ -1,47 +1,118 @@
-<div id="search-results" class="max-w-4xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
-  <div class="mb-4">
-    <h2 class="text-xl font-semibold mb-2">Results</h2>
-    <p class="text-slate-500">
-      <% if (query && query.trim()) { %>
-        Showing results for "<strong><%= query %></strong>"
-      <% } else { %>
-        Showing all published upcoming events.
-      <% } %>
-    </p>
+<div
+  id="search-results"
+  class="max-w-5xl rounded-3xl border border-slate-200 bg-white p-4 shadow-xl sm:p-6 lg:p-7"
+>
+  <div class="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <p class="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-blue-700">
+        Results
+      </p>
+
+      <h2 class="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+        <% if (query && query.trim()) { %>
+          Matches for “<%= query %>”
+        <% } else { %>
+          All upcoming events
+        <% } %>
+      </h2>
+
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+        <% if (query && query.trim()) { %>
+          Showing published upcoming events that match your search.
+        <% } else { %>
+          Showing all published upcoming events.
+        <% } %>
+      </p>
+    </div>
+
+    <div class="inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700">
+      <span class="h-2.5 w-2.5 rounded-full bg-blue-600"></span>
+      <%= events ? events.length : 0 %> result<%= events && events.length === 1 ? "" : "s" %>
+    </div>
   </div>
 
   <% if (pageError) { %>
-    <div class="mb-4 p-4 rounded-xl border border-red-200 bg-red-50 text-red-800" aria-live="polite">
-      <h3 class="text-base font-semibold mb-1">Error</h3>
-      <p class="mb-0 text-sm"><%= pageError %></p>
+    <div
+      class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-800 shadow-sm"
+      aria-live="polite"
+    >
+      <h3 class="mb-1 text-base font-bold">Search error</h3>
+      <p class="mb-0 text-sm leading-6"><%= pageError %></p>
     </div>
   <% } %>
 
   <% if (!events || events.length === 0) { %>
-    <p class="text-slate-500 mb-0">No matching events found.</p>
+    <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center sm:p-10">
+      <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm">
+        🔎
+      </div>
+
+      <h3 class="mb-2 text-xl font-black text-slate-900">
+        No matching events found.
+      </h3>
+
+      <p class="mx-auto mb-0 max-w-md text-sm leading-6 text-slate-500">
+        Try a different title, location, or keyword. Clearing the search will show all published upcoming events again.
+      </p>
+    </div>
   <% } else { %>
-    <ul class="list-none m-0 p-0 grid gap-4">
+    <ul class="grid list-none gap-4 p-0 sm:gap-5">
       <% events.forEach((event) => { %>
-        <li class="p-4 border border-slate-200 rounded-xl bg-slate-50">
-          <h3 class="text-lg font-semibold text-slate-900 mb-1"><%= event.title %></h3>
-          <p class="text-sm text-slate-500 mb-2"><%= event.description %></p>
+        <li class="group overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl">
+          <div class="grid gap-0 md:grid-cols-[0.25fr_1fr]">
+            <div class="hidden bg-gradient-to-br from-blue-600 to-indigo-700 md:block"></div>
 
-          <p class="text-sm text-slate-600 mb-0">
-            <strong>Location:</strong> <%= event.location %>
-          </p>
-          <p class="text-sm text-slate-600 mb-0">
-            <strong>Category:</strong> <%= event.category %>
-          </p>
-          <p class="text-sm text-slate-600 mb-3">
-            <strong>Start:</strong> <%= new Date(event.startDateTime).toLocaleString() %>
-          </p>
+            <div class="p-5 sm:p-6">
+              <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0">
+                  <div class="mb-3 flex flex-wrap items-center gap-2">
+                    <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-700">
+                      <%= event.category %>
+                    </span>
 
-          <a
-            href="/events/<%= event.id %>"
-            class="inline-block px-3 py-2 rounded-lg bg-white border border-slate-300 text-slate-800 no-underline hover:bg-slate-100 text-sm font-medium"
-          >
-            View Event
-          </a>
+                    <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-emerald-700">
+                      Upcoming
+                    </span>
+                  </div>
+
+                  <h3 class="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                    <%= event.title %>
+                  </h3>
+                </div>
+
+                <a
+                  href="/events/<%= event.id %>"
+                  class="inline-flex shrink-0 items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 no-underline shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
+                >
+                  View Event
+                </a>
+              </div>
+
+              <p class="mb-5 max-w-2xl text-sm leading-6 text-slate-600">
+                <%= event.description %>
+              </p>
+
+              <div class="grid gap-3 text-sm text-slate-600 lg:grid-cols-2">
+                <div class="rounded-2xl border border-slate-200 bg-white p-3">
+                  <p class="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+                    Location
+                  </p>
+                  <p class="mb-0 font-semibold text-slate-800">
+                    <%= event.location %>
+                  </p>
+                </div>
+
+                <div class="rounded-2xl border border-slate-200 bg-white p-3">
+                  <p class="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+                    Starts
+                  </p>
+                  <p class="mb-0 font-semibold text-slate-800">
+                    <%= new Date(event.startDateTime).toLocaleString() %>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </li>
       <% }) %>
     </ul>
