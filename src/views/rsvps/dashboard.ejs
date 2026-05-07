@@ -1,46 +1,273 @@
-<section class="glass-panel">
-  <h1>My RSVPs</h1>
+<section
+  class="rounded-3xl border border-slate-200 bg-white/90 shadow-xl shadow-slate-200/70 overflow-hidden"
+  x-data="{ activeTab: 'upcoming', expanded: null }"
+>
+  <div class="bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 px-5 py-6 sm:px-8 sm:py-8 text-white">
+    <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-blue-100">Personal dashboard</p>
+        <h1 class="mt-2 text-3xl sm:text-4xl font-extrabold tracking-tight">My RSVPs</h1>
+        <p class="mt-2 max-w-2xl text-sm sm:text-base text-blue-50">
+          Track the events you are attending, manage your waitlist spots, and review past or cancelled RSVPs.
+        </p>
+      </div>
 
-  <section id="upcoming-rsvps">
-    <h2>Upcoming</h2>
-    <% if (dashboard.upcoming.length === 0) { %>
-      <p>No upcoming RSVPs.</p>
-    <% } %>
+      <div class="grid grid-cols-2 gap-3 sm:min-w-64">
+        <div class="rounded-2xl bg-white/15 px-4 py-3 backdrop-blur border border-white/20">
+          <p class="text-xs uppercase tracking-wide text-blue-100">Upcoming</p>
+          <p class="mt-1 text-2xl font-bold"><%= dashboard.upcoming.length %></p>
+        </div>
+        <div class="rounded-2xl bg-white/15 px-4 py-3 backdrop-blur border border-white/20">
+          <p class="text-xs uppercase tracking-wide text-blue-100">Past / Cancelled</p>
+          <p class="mt-1 text-2xl font-bold"><%= dashboard.past.length %></p>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <% dashboard.upcoming.forEach(({ event, rsvp }) => { %>
-      <div id="rsvp-row-<%= rsvp.id %>" class="entry-card">
-        <h3><%= event.title %></h3>
-        <p><strong>RSVP status:</strong> <%= rsvp.status %></p>
-        <p><strong>Category:</strong> <%= event.category %></p>
-        <p><strong>Location:</strong> <%= event.location %></p>
-        <p><strong>Starts:</strong> <%= new Date(event.startDateTime).toLocaleString() %></p>
+  <div class="px-5 py-5 sm:px-8 border-b border-slate-200 bg-slate-50/80">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p class="text-sm text-slate-600">
+        Use the tabs to switch between active RSVPs and previous activity.
+      </p>
 
-        <form
-          hx-post="/events/<%= event.id %>/rsvp"
-          hx-target="#rsvp-row-<%= rsvp.id %>"
-          hx-swap="outerHTML"
+      <div class="inline-flex rounded-2xl bg-white p-1 border border-slate-200 shadow-sm">
+        <button
+          type="button"
+          x-on:click="activeTab = 'upcoming'"
+          x-bind:class="activeTab === 'upcoming'
+            ? 'bg-blue-600 text-white shadow-sm'
+            : 'text-slate-600 hover:bg-slate-100'"
+          class="rounded-xl px-4 py-2 text-sm font-semibold transition"
         >
-          <button type="submit">Cancel RSVP</button>
-        </form>
+          Upcoming
+        </button>
+        <button
+          type="button"
+          x-on:click="activeTab = 'past'"
+          x-bind:class="activeTab === 'past'
+            ? 'bg-blue-600 text-white shadow-sm'
+            : 'text-slate-600 hover:bg-slate-100'"
+          class="rounded-xl px-4 py-2 text-sm font-semibold transition"
+        >
+          Past / Cancelled
+        </button>
       </div>
-    <% }) %>
-  </section>
+    </div>
+  </div>
 
-  <section id="past-rsvps">
-    <h2>Past / Cancelled</h2>
-    <% if (dashboard.past.length === 0) { %>
-      <p>No past or cancelled RSVPs.</p>
-    <% } %>
-
-    <% dashboard.past.forEach(({ event, rsvp }) => { %>
-      <div class="entry-card">
-        <h3><%= event.title %></h3>
-        <p><strong>RSVP status:</strong> <%= rsvp.status %></p>
-        <p><strong>Event status:</strong> <%= event.status %></p>
-        <p><strong>Category:</strong> <%= event.category %></p>
-        <p><strong>Location:</strong> <%= event.location %></p>
-        <p><strong>Starts:</strong> <%= new Date(event.startDateTime).toLocaleString() %></p>
+  <div class="p-5 sm:p-8">
+    <section
+      id="upcoming-rsvps"
+      x-show="activeTab === 'upcoming'"
+      x-transition.opacity.duration.200ms
+    >
+      <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Upcoming</h2>
+          <p class="mt-1 text-sm text-slate-500">Events you are currently going to or waiting for.</p>
+        </div>
       </div>
-    <% }) %>
-  </section>
+
+      <% if (dashboard.upcoming.length === 0) { %>
+        <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+            <span class="text-xl">📅</span>
+          </div>
+          <h3 class="mt-4 text-lg font-bold text-slate-900">No upcoming RSVPs</h3>
+          <p class="mt-2 text-sm text-slate-500">
+            Once you RSVP to an event, it will appear here.
+          </p>
+        </div>
+      <% } %>
+
+      <div class="grid gap-4 md:grid-cols-2">
+        <% dashboard.upcoming.forEach(({ event, rsvp }) => { %>
+          <article
+            id="rsvp-row-<%= rsvp.id %>"
+            class="group rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  <%= event.category %>
+                </p>
+                <h3 class="mt-2 text-xl font-bold text-slate-900 group-hover:text-blue-700">
+                  <%= event.title %>
+                </h3>
+              </div>
+
+              <% if (rsvp.status === "going") { %>
+                <span class="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                  Going
+                </span>
+              <% } else if (rsvp.status === "waitlisted") { %>
+                <span class="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                  Waitlisted
+                </span>
+              <% } else { %>
+                <span class="shrink-0 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                  <%= rsvp.status %>
+                </span>
+              <% } %>
+            </div>
+
+            <div class="mt-4 space-y-3 text-sm text-slate-600">
+              <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100">📍</span>
+                <span class="line-clamp-1"><%= event.location %></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100">🕒</span>
+                <span><%= new Date(event.startDateTime).toLocaleString() %></span>
+              </div>
+            </div>
+
+            <div
+              x-show="expanded === '<%= rsvp.id %>'"
+              x-transition
+              class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600"
+            >
+              <dl class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt class="font-semibold text-slate-900">RSVP status</dt>
+                  <dd class="mt-1 capitalize"><%= rsvp.status %></dd>
+                </div>
+                <div>
+                  <dt class="font-semibold text-slate-900">Event status</dt>
+                  <dd class="mt-1 capitalize"><%= event.status %></dd>
+                </div>
+                <div>
+                  <dt class="font-semibold text-slate-900">Category</dt>
+                  <dd class="mt-1"><%= event.category %></dd>
+                </div>
+                <div>
+                  <dt class="font-semibold text-slate-900">Starts</dt>
+                  <dd class="mt-1"><%= new Date(event.startDateTime).toLocaleString() %></dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                x-on:click="expanded = expanded === '<%= rsvp.id %>' ? null : '<%= rsvp.id %>'"
+                class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                <span x-show="expanded !== '<%= rsvp.id %>'">View details</span>
+                <span x-show="expanded === '<%= rsvp.id %>'">Hide details</span>
+              </button>
+
+              <form
+                x-data="{ confirming: false }"
+                hx-post="/events/<%= event.id %>/rsvp"
+                hx-target="#rsvp-row-<%= rsvp.id %>"
+                hx-swap="outerHTML"
+                class="m-0"
+              >
+                <template x-if="!confirming">
+                  <button
+                    type="button"
+                    x-on:click="confirming = true"
+                    class="w-full rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 sm:w-auto"
+                  >
+                    Cancel RSVP
+                  </button>
+                </template>
+
+                <div
+                  x-show="confirming"
+                  x-transition
+                  class="flex flex-col gap-2 sm:flex-row sm:items-center"
+                >
+                  <button
+                    type="submit"
+                    class="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
+                  >
+                    Confirm cancel
+                  </button>
+                  <button
+                    type="button"
+                    x-on:click="confirming = false"
+                    class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
+                  >
+                    Keep RSVP
+                  </button>
+                </div>
+              </form>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+
+    <section
+      id="past-rsvps"
+      x-show="activeTab === 'past'"
+      x-transition.opacity.duration.200ms
+    >
+      <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Past / Cancelled</h2>
+          <p class="mt-1 text-sm text-slate-500">
+            A record of previous events and RSVPs you cancelled.
+          </p>
+        </div>
+      </div>
+
+      <% if (dashboard.past.length === 0) { %>
+        <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-200 text-slate-700">
+            <span class="text-xl">✅</span>
+          </div>
+          <h3 class="mt-4 text-lg font-bold text-slate-900">No past or cancelled RSVPs</h3>
+          <p class="mt-2 text-sm text-slate-500">
+            Past and cancelled RSVP activity will appear here.
+          </p>
+        </div>
+      <% } %>
+
+      <div class="grid gap-4 md:grid-cols-2">
+        <% dashboard.past.forEach(({ event, rsvp }) => { %>
+          <article class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  <%= event.category %>
+                </p>
+                <h3 class="mt-2 text-xl font-bold text-slate-900">
+                  <%= event.title %>
+                </h3>
+              </div>
+
+              <% if (rsvp.status === "cancelled") { %>
+                <span class="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700">
+                  Cancelled
+                </span>
+              <% } else { %>
+                <span class="shrink-0 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 capitalize">
+                  <%= rsvp.status %>
+                </span>
+              <% } %>
+            </div>
+
+            <dl class="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+              <div class="rounded-2xl bg-slate-50 p-3">
+                <dt class="font-semibold text-slate-900">Event status</dt>
+                <dd class="mt-1 capitalize"><%= event.status %></dd>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-3">
+                <dt class="font-semibold text-slate-900">Location</dt>
+                <dd class="mt-1"><%= event.location %></dd>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-3 sm:col-span-2">
+                <dt class="font-semibold text-slate-900">Starts</dt>
+                <dd class="mt-1"><%= new Date(event.startDateTime).toLocaleString() %></dd>
+              </div>
+            </dl>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  </div>
 </section>

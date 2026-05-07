@@ -47,7 +47,12 @@
     </div>
   </section>
 <% } else { %>
-  <section class="max-w-3xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg">
+  <!-- Added Alpine.js container -->
+  <section 
+    x-data="unsavedChangesWarning()" 
+    x-init="initFormData()"
+    class="max-w-3xl p-6 border border-slate-200 rounded-2xl bg-white shadow-lg"
+  >
     <div class="mb-4">
       <h2 class="text-xl font-semibold mb-2">Event Details</h2>
       <p class="text-slate-500">
@@ -72,6 +77,13 @@
       hx-select="#form-status"
       hx-swap="outerHTML"
     >
+      <!-- Unsaved changes warning banner -->
+      <div x-show="hasChanges" 
+           x-transition 
+           class="mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+        ⚠️ You have unsaved changes. Don't forget to save before leaving!
+      </div>
+
       <div>
         <label for="title" class="block text-sm font-medium mb-1">Title</label>
         <input
@@ -223,6 +235,53 @@
 <% } %>
 
 <script>
+  function unsavedChangesWarning() {
+    return {
+      originalFormData: {},
+      hasChanges: false,
+      
+      initFormData() {
+        // Store original form values
+        const form = this.$el.querySelector('form');
+        if (form) {
+          const formData = new FormData(form);
+          for (let [key, value] of formData.entries()) {
+            this.originalFormData[key] = value;
+          }
+          
+          // Listen for changes on all form inputs
+          form.querySelectorAll('input, textarea, select').forEach(input => {
+            input.addEventListener('change', () => this.checkForChanges());
+            input.addEventListener('input', () => this.checkForChanges());
+          });
+        }
+        
+        // Warn before page reload/navigation
+        window.addEventListener('beforeunload', (e) => {
+          if (this.hasChanges) {
+            e.preventDefault();
+            e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+            return e.returnValue;
+          }
+        });
+      },
+      
+      checkForChanges() {
+        const form = this.$el.querySelector('form');
+        if (form) {
+          const formData = new FormData(form);
+          for (let [key, value] of formData.entries()) {
+            if (this.originalFormData[key] !== value) {
+              this.hasChanges = true;
+              return;
+            }
+          }
+          this.hasChanges = false;
+        }
+      }
+    }
+  }
+  
   document.body.addEventListener('htmx:beforeSwap', function (evt) {
     if (!evt.detail.target || evt.detail.target.id !== 'form-status') return;
 

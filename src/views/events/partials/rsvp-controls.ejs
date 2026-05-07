@@ -1,81 +1,150 @@
 <%
-  const currentStatus = state.currentRSVP ? state.currentRSVP.status : null;
-  const isFull =
-    typeof state.event.capacity === "number"
-      ? state.attendeeCount >= state.event.capacity
-      : false;
+const currentStatus = state.currentRSVP ? state.currentRSVP.status : null;
+const isFull =
+  typeof state.event.capacity === "number"
+    ? state.attendeeCount >= state.event.capacity
+    : false;
 
-  let statusText = "Not RSVPed";
-  let statusClasses = "bg-slate-100 text-slate-700";
+let statusText = "Not RSVPed";
+let statusDescription = "You have not joined this event yet.";
+let statusClasses = "border-slate-200 bg-slate-50 text-slate-700";
+let statusDotClasses = "bg-slate-400";
+let panelAccentClasses = "from-slate-50 to-white";
+let buttonText = isFull ? "Join Waitlist" : "RSVP";
+let buttonClasses = "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-200";
 
-  if (currentStatus === "going") {
-    statusText = "Going";
-    statusClasses = "bg-green-100 text-green-800";
-  } else if (currentStatus === "waitlisted") {
-    statusText = "Waitlisted";
-    statusClasses = "bg-yellow-100 text-yellow-800";
-  } else if (currentStatus === "cancelled") {
-    statusText = "Cancelled";
-    statusClasses = "bg-slate-100 text-slate-700";
-  }
+if (currentStatus === "going") {
+  statusText = "Going";
+  statusDescription = "You are currently attending this event.";
+  statusClasses = "border-emerald-200 bg-emerald-50 text-emerald-800";
+  statusDotClasses = "bg-emerald-500";
+  panelAccentClasses = "from-emerald-50 to-white";
+  buttonText = "Cancel RSVP";
+  buttonClasses = "bg-red-600 text-white hover:bg-red-700 focus:ring-red-200";
+} else if (currentStatus === "waitlisted") {
+  statusText = "Waitlisted";
+  statusDescription = "You are on the waitlist for this event.";
+  statusClasses = "border-amber-200 bg-amber-50 text-amber-800";
+  statusDotClasses = "bg-amber-500";
+  panelAccentClasses = "from-amber-50 to-white";
+  buttonText = "Leave Waitlist";
+  buttonClasses = "bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-200";
+} else if (currentStatus === "cancelled") {
+  statusText = "Cancelled";
+  statusDescription = "Your RSVP was cancelled. You can rejoin if the event is still available.";
+  statusClasses = "border-slate-200 bg-slate-100 text-slate-700";
+  statusDotClasses = "bg-slate-500";
+  panelAccentClasses = "from-slate-100 to-white";
+  buttonText = isFull ? "Rejoin Waitlist" : "Rejoin Event";
+  buttonClasses = isFull
+    ? "bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-200"
+    : "bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-200";
+}
 
-  let buttonText = isFull ? "Join Waitlist" : "RSVP";
-  if (currentStatus === "going" || currentStatus === "waitlisted") {
-    buttonText = "Cancel RSVP";
-  } else if (currentStatus === "cancelled") {
-    buttonText = isFull ? "Rejoin Waitlist" : "Rejoin Event";
-  }
+const capacityText =
+  typeof state.event.capacity === "number"
+    ? `${state.attendeeCount} / ${state.event.capacity} attending`
+    : `${state.attendeeCount} attending`;
 %>
 
-<div id="rsvp-controls-<%= state.event.id %>" class="border-t border-slate-200 pt-4 mt-4">
-  <div class="flex flex-wrap items-center gap-3 mb-3">
-    <span class="inline-block px-2 py-1 rounded text-xs font-semibold <%= statusClasses %>">
-      <%= statusText %>
-    </span>
+<div
+  id="rsvp-controls-<%= state.event.id %>"
+  class="mt-6 border-t border-slate-200 pt-6"
+  x-data="{ visible: false, pressed: false }"
+  x-init="$nextTick(() => visible = true)"
+>
+  <div
+    class="rounded-3xl border border-slate-200 bg-gradient-to-br <%= panelAccentClasses %> p-4 shadow-lg transition duration-300 ease-out sm:p-5"
+    x-bind:class="visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.98] opacity-0'"
+  >
+    <div class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div class="min-w-0">
+        <p class="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-blue-700">
+          RSVP Status
+        </p>
 
-    <span class="text-sm text-slate-600">
-      <% if (typeof state.event.capacity === "number") { %>
-        <strong><%= state.attendeeCount %></strong> / <strong><%= state.event.capacity %></strong> attending
-      <% } else { %>
-        <strong><%= state.attendeeCount %></strong> attending
-      <% } %>
-    </span>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-bold <%= statusClasses %>">
+            <span class="h-2.5 w-2.5 rounded-full <%= statusDotClasses %>"></span>
+            <%= statusText %>
+          </span>
+        </div>
 
-    <% if (state.waitlistPosition !== null) { %>
-      <span class="inline-block px-2 py-1 rounded text-xs font-semibold bg-orange-100 text-orange-800">
-        Waitlist position: #<%= state.waitlistPosition %>
-      </span>
+        <% if (state.waitlistPosition !== null) { %>
+          <div
+            class="mt-4 max-w-md rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4 shadow-sm"
+            aria-label="Waitlist position"
+          >
+            <div class="flex items-center gap-3">
+              <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-lg font-extrabold text-white shadow-sm">
+                #<%= state.waitlistPosition %>
+              </div>
+
+              <div>
+                <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-amber-700">
+                  Waitlist position
+                </p>
+                <p class="mt-1 text-sm font-semibold text-slate-700">
+                  You are currently number <strong class="text-amber-800"><%= state.waitlistPosition %></strong> on the waitlist.
+                </p>
+              </div>
+            </div>
+          </div>
+        <% } %>
+
+        <p class="mt-3 max-w-xl text-sm leading-6 text-slate-600">
+          <%= statusDescription %>
+        </p>
+      </div>
+
+      <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+        <p class="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+          Attendance
+        </p>
+        <p class="mb-0 font-bold text-slate-900">
+          <%= capacityText %>
+        </p>
+      </div>
+    </div>
+
+    <% if (actionError) { %>
+      <div
+        class="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 shadow-sm"
+        aria-live="polite"
+      >
+        <p class="mb-1 font-bold">Could not update RSVP</p>
+        <p class="mb-0"><%= actionError %></p>
+      </div>
+    <% } %>
+
+    <% if (actionSuccess) { %>
+      <div
+        class="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 shadow-sm"
+        aria-live="polite"
+      >
+        <p class="mb-0 font-bold">✓ <%= actionSuccess %></p>
+      </div>
+    <% } %>
+
+    <% if (session.authenticatedUser.role !== "user") { %>
+      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+        Organizers and admins cannot RSVP to events.
+      </div>
+    <% } else if (!state.canInteract) { %>
+      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+        RSVP is unavailable for this event.
+      </div>
+    <% } else { %>
+      <button
+        hx-post="/events/<%= state.event.id %>/rsvp"
+        hx-target="#rsvp-controls-<%= state.event.id %>"
+        hx-swap="outerHTML"
+        x-on:click="pressed = true"
+        x-bind:class="pressed ? 'scale-95 opacity-80' : 'scale-100 opacity-100'"
+        class="inline-flex w-full items-center justify-center rounded-2xl px-5 py-3 text-sm font-bold shadow-lg transition duration-200 hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus:ring-4 sm:w-auto <%= buttonClasses %>"
+      >
+        <%= buttonText %>
+      </button>
     <% } %>
   </div>
-
-  <% if (actionError) { %>
-    <div class="mb-3 p-3 rounded-lg border border-red-200 bg-red-50 text-red-800 text-sm" aria-live="polite">
-      <strong>Error:</strong> <%= actionError %>
-    </div>
-  <% } %>
-
-  <% if (actionSuccess) { %>
-    <div class="mb-3 p-3 rounded-lg border border-green-200 bg-green-50 text-green-800 text-sm" aria-live="polite">
-      <span class="mr-1">✓</span> <%= actionSuccess %>
-    </div>
-  <% } %>
-
-  <% if (session.authenticatedUser.role !== "user") { %>
-    <p class="text-sm text-slate-500 mb-0">
-      Organizers and admins cannot RSVP to events.
-    </p>
-  <% } else if (!state.canInteract) { %>
-    <p class="text-sm text-slate-500 mb-0">
-      RSVP is unavailable for this event.
-    </p>
-  <% } else { %>
-    <button
-      hx-post="/events/<%= state.event.id %>/rsvp"
-      hx-target="#rsvp-controls-<%= state.event.id %>"
-      hx-swap="outerHTML"
-      class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 text-sm cursor-pointer"
-    >
-      <%= buttonText %>
-    </button>
-  <% } %>
 </div>

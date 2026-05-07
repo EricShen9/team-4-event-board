@@ -4,86 +4,109 @@
   <p style="color: red;"><%= pageError %></p>
 <% } %>
 
-<h2>Published (<%= published.length %>)</h2>
-<% if (published.length === 0) { %>
-  <p>No published events.</p>
-<% } else { %>
-  <table>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Date</th>
-        <th>Category</th>
-        <th>Attending / Capacity</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% published.forEach(function(row) { %>
-        <tr>
-          <td><%= row.event.title %></td>
-          <td><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
-          <td><%= row.event.category %></td>
-          <td><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
-          <td><%- include("./partials/event-status-controls", { event: row.event, session: session, actionError: null, actionSuccess: null }) %></td>
+<!-- PUBLISHED SECTION — green accent -->
+<section style="margin-bottom: 2rem; border-left: 4px solid #16a34a; background: #f0fdf4; border-radius: 8px; padding: 1.25rem;">
+  <h2 style="margin-top: 0; color: #15803d;">Published (<%= published.length %>)</h2>
+  <% if (published.length === 0) { %>
+    <p>No published events.</p>
+  <% } else { %>
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="background: #dcfce7;">
+          <th style="text-align: left; padding: 0.5rem;">Title</th>
+          <th style="text-align: left; padding: 0.5rem;">Date</th>
+          <th style="text-align: left; padding: 0.5rem;">Category</th>
+          <th style="text-align: left; padding: 0.5rem;">Attending / Capacity</th>
+          <th style="text-align: left; padding: 0.5rem;">Actions</th>
         </tr>
-      <% }); %>
-    </tbody>
-  </table>
-<% } %>
+      </thead>
+      <tbody>
+        <% published.forEach(function(row) { %>
+          <tr style="border-bottom: 1px solid #bbf7d0;">
+            <td style="padding: 0.5rem;"><%= row.event.title %></td>
+            <td style="padding: 0.5rem;"><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
+            <td style="padding: 0.5rem;"><%= row.event.category %></td>
+            <td style="padding: 0.5rem;"><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
+            <td style="padding: 0.5rem;"><%- include("./partials/event-status-controls", { event: row.event, session: session, actionError: null, actionSuccess: null }) %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
 
-<h2>Draft (<%= draft.length %>)</h2>
-<% if (draft.length === 0) { %>
-  <p>No draft events.</p>
-<% } else { %>
-  <table>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Date</th>
-        <th>Category</th>
-        <th>Attending / Capacity</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% draft.forEach(function(row) { %>
-        <tr>
-          <td><%= row.event.title %></td>
-          <td><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
-          <td><%= row.event.category %></td>
-          <td><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
-          <td><%- include("./partials/event-status-controls", { event: row.event, session: session, actionError: null, actionSuccess: null }) %></td>
+<!-- DRAFT SECTION — amber accent -->
+<section style="margin-bottom: 2rem; border-left: 4px solid #d97706; background: #fffbeb; border-radius: 8px; padding: 1.25rem;">
+  <h2 style="margin-top: 0; color: #b45309;">Draft (<%= draft.length %>)</h2>
+  <% if (draft.length === 0) { %>
+    <p>No draft events.</p>
+  <% } else { %>
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="background: #fef3c7;">
+          <th style="text-align: left; padding: 0.5rem;">Title</th>
+          <th style="text-align: left; padding: 0.5rem;">Date</th>
+          <th style="text-align: left; padding: 0.5rem;">Category</th>
+          <th style="text-align: left; padding: 0.5rem;">Attending / Capacity</th>
+          <th style="text-align: left; padding: 0.5rem;">Actions</th>
         </tr>
-      <% }); %>
-    </tbody>
-  </table>
-<% } %>
+      </thead>
+      <tbody>
+        <% draft.forEach(function(row) { %>
+          <tr style="border-bottom: 1px solid #fde68a;">
+            <td style="padding: 0.5rem;"><%= row.event.title %></td>
+            <td style="padding: 0.5rem;"><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
+            <td style="padding: 0.5rem;"><%= row.event.category %></td>
+            <td style="padding: 0.5rem;"><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
+            <td style="padding: 0.5rem;"><%- include("./partials/event-status-controls", { event: row.event, session: session, actionError: null, actionSuccess: null }) %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
 
-<h2>Cancelled / Past (<%= cancelledOrPast.length %>)</h2>
-<% if (cancelledOrPast.length === 0) { %>
-  <p>No cancelled or past events.</p>
-<% } else { %>
-  <table>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Date</th>
-        <th>Category</th>
-        <th>Status</th>
-        <th>Attending / Capacity</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% cancelledOrPast.forEach(function(row) { %>
-        <tr>
-          <td><%= row.event.title %></td>
-          <td><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
-          <td><%= row.event.category %></td>
-          <td><%= row.event.status %></td>
-          <td><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
-        </tr>
-      <% }); %>
-    </tbody>
-  </table>
-<% } %>
+<!-- CANCELLED / PAST SECTION — gray accent, collapsible via Alpine.js -->
+<section x-data="{ open: false }" style="margin-bottom: 2rem; border-left: 4px solid #6b7280; background: #f9fafb; border-radius: 8px; padding: 1.25rem; opacity: 0.85;">
+  <div style="display: flex; align-items: center; justify-content: space-between;">
+    <h2 style="margin: 0; color: #4b5563;">Cancelled / Past (<%= cancelledOrPast.length %>)</h2>
+    <button
+      @click="open = !open"
+      style="background: #e5e7eb; border: 1px solid #d1d5db; border-radius: 4px; padding: 0.35rem 0.75rem; cursor: pointer; font-size: 0.85rem; color: #374151;"
+      x-text="open ? 'Collapse ▲' : 'Expand ▼'"
+    ></button>
+  </div>
+
+  <div x-show="open" x-collapse>
+    <% if (cancelledOrPast.length === 0) { %>
+      <p style="margin-top: 1rem;">No cancelled or past events.</p>
+    <% } else { %>
+      <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+        <thead>
+          <tr style="background: #e5e7eb;">
+            <th style="text-align: left; padding: 0.5rem;">Title</th>
+            <th style="text-align: left; padding: 0.5rem;">Date</th>
+            <th style="text-align: left; padding: 0.5rem;">Category</th>
+            <th style="text-align: left; padding: 0.5rem;">Status</th>
+            <th style="text-align: left; padding: 0.5rem;">Attending / Capacity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% cancelledOrPast.forEach(function(row) { %>
+            <tr style="border-bottom: 1px solid #d1d5db;">
+              <td style="padding: 0.5rem;"><%= row.event.title %></td>
+              <td style="padding: 0.5rem;"><%= new Date(row.event.startDateTime).toLocaleDateString() %></td>
+              <td style="padding: 0.5rem;"><%= row.event.category %></td>
+              <td style="padding: 0.5rem;">
+                <span style="background: #fee2e2; color: #991b1b; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.8rem;">
+                  <%= row.event.status %>
+                </span>
+              </td>
+              <td style="padding: 0.5rem;"><%= row.attendeeCount %><% if (row.event.capacity) { %> / <%= row.event.capacity %><% } %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+</section>

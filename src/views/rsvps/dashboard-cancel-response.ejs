@@ -1,19 +1,71 @@
 <div id="rsvp-row-<%= cancelledRsvpId %>"></div>
 
-<section id="past-rsvps" hx-swap-oob="outerHTML">
-  <h2>Past / Cancelled</h2>
+<section
+  id="past-rsvps"
+  hx-swap-oob="outerHTML"
+  x-show="activeTab === 'past'"
+  x-transition.opacity.duration.200ms
+>
+  <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h2 class="text-2xl font-bold text-slate-900">Past / Cancelled</h2>
+      <p class="mt-1 text-sm text-slate-500">
+        A record of previous events and RSVPs you cancelled.
+      </p>
+    </div>
+  </div>
+
   <% if (dashboard.past.length === 0) { %>
-    <p>No past or cancelled RSVPs.</p>
+    <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+      <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-200 text-slate-700">
+        <span class="text-xl">✅</span>
+      </div>
+      <h3 class="mt-4 text-lg font-bold text-slate-900">No past or cancelled RSVPs</h3>
+      <p class="mt-2 text-sm text-slate-500">
+        Past and cancelled RSVP activity will appear here.
+      </p>
+    </div>
   <% } %>
 
-  <% dashboard.past.forEach(({ event, rsvp }) => { %>
-    <div class="entry-card">
-      <h3><%= event.title %></h3>
-      <p><strong>RSVP status:</strong> <%= rsvp.status %></p>
-      <p><strong>Event status:</strong> <%= event.status %></p>
-      <p><strong>Category:</strong> <%= event.category %></p>
-      <p><strong>Location:</strong> <%= event.location %></p>
-      <p><strong>Starts:</strong> <%= new Date(event.startDateTime).toLocaleString() %></p>
-    </div>
-  <% }) %>
+  <div class="grid gap-4 md:grid-cols-2">
+    <% dashboard.past.forEach(({ event, rsvp }) => { %>
+      <article class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <%= event.category %>
+            </p>
+            <h3 class="mt-2 text-xl font-bold text-slate-900">
+              <%= event.title %>
+            </h3>
+          </div>
+
+          <% if (rsvp.status === "cancelled") { %>
+            <span class="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700">
+              Cancelled
+            </span>
+          <% } else { %>
+            <span class="shrink-0 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 capitalize">
+              <%= rsvp.status %>
+            </span>
+          <% } %>
+        </div>
+
+        <dl class="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+          <div class="rounded-2xl bg-slate-50 p-3">
+            <dt class="font-semibold text-slate-900">Event status</dt>
+            <dd class="mt-1 capitalize"><%= event.status %></dd>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-3">
+            <dt class="font-semibold text-slate-900">Location</dt>
+            <dd class="mt-1"><%= event.location %></dd>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-3 sm:col-span-2">
+            <dt class="font-semibold text-slate-900">Starts</dt>
+            <dd class="mt-1"><%= new Date(event.startDateTime).toLocaleString() %></dd>
+          </div>
+        </dl>
+      </article>
+    <% }) %>
+  </div>
 </section>
